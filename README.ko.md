@@ -46,7 +46,13 @@ OBS Studio용 확장 오디오 필터 창입니다. **VST2 / VST3** 호스팅, �
   이미지로 저장
 - 도구 > VST Ex Audio Filter: 언어 (EN / JP / KR / ID / FR / TW), 버전, 디버그 정보
 
-<!-- 스크린샷: 여기에 한국어 UI의 작은 이미지를 추가 (예: docs/ko/*.png). -->
+## 미리 보기
+
+![필터 (VST Ex) 창, VST Ex Mixer 도크, VST Ex 도크](docs/images/preview-filters.jpg)
+*필터 (VST Ex) 창, VST Ex Mixer 도크, VST Ex 도크*
+
+![VST 플러그인 선택 (썸네일 보기)](docs/images/preview-browser.jpg)
+*VST 플러그인 선택 (썸네일 보기)*
 
 ## 빌드
 

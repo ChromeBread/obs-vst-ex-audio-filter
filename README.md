@@ -47,7 +47,13 @@ lists every folder to delete).
   optional half-circle imager, save as image
 - Tools > VST Ex Audio Filter: language (EN / JP / KR / ID / FR / TW), version, debug information
 
-<!-- Screenshots: add small images per language here (e.g. docs/en/*.png). -->
+## Preview
+
+![Filters (VST Ex) window, VST Ex Mixer and VST Ex docks](docs/images/preview-filters.jpg)
+*Filters (VST Ex) window, VST Ex Mixer and VST Ex docks*
+
+![Choose a VST Plugin (thumbnail view)](docs/images/preview-browser.jpg)
+*Choose a VST Plugin (thumbnail view)*
 
 ## Build
 

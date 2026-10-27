@@ -48,7 +48,13 @@ Désinstallation : quittez OBS et supprimez ce dossier `obs-vst-ex-audio-filter`
   imageur en demi-cercle (optionnel), enregistrement en image
 - Outils > VST Ex Audio Filter : langue (EN / JP / KR / ID / FR / TW), version, informations de débogage
 
-<!-- Captures : ajoutez ici de petites images de l’interface en français (ex. docs/fr/*.png). -->
+## Aperçu
+
+![Fenêtre Filtres (VST Ex), docks VST Ex Mixer et VST Ex](docs/images/preview-filters.jpg)
+*Fenêtre Filtres (VST Ex), docks VST Ex Mixer et VST Ex*
+
+![Choisir un plugin VST (vue miniatures)](docs/images/preview-browser.jpg)
+*Choisir un plugin VST (vue miniatures)*
 
 ## Compilation
 

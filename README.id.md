@@ -48,7 +48,13 @@ Hapus instalasi: tutup OBS dan hapus folder `obs-vst-ex-audio-filter` itu
   imager setengah lingkaran (opsional), simpan sebagai gambar
 - Alat > VST Ex Audio Filter: bahasa (EN / JP / KR / ID / FR / TW), versi, info debug
 
-<!-- Tangkapan layar: tambahkan gambar kecil UI bahasa Indonesia di sini (mis. docs/id/*.png). -->
+## Pratinjau
+
+![Jendela Filter (VST Ex), dock VST Ex Mixer dan VST Ex](docs/images/preview-filters.jpg)
+*Jendela Filter (VST Ex), dock VST Ex Mixer dan VST Ex*
+
+![Pilih Plugin VST (tampilan gambar mini)](docs/images/preview-browser.jpg)
+*Pilih Plugin VST (tampilan gambar mini)*
 
 ## Build
 

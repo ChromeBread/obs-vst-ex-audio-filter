@@ -45,7 +45,13 @@ OBS Studio 的擴充音訊濾鏡視窗，內建 **VST2 / VST3** 外掛支援、�
 -「VST Ex Chain View」(工具選單): 從裝置到輸出的所有來源、延遲、音量、側鏈、半圓聲像儀 (可選)、另存為圖片
 - 工具 > VST Ex Audio Filter: 語言 (EN / JP / KR / ID / FR / TW)、版本、除錯資訊
 
-<!-- 截圖: 在此加入繁體中文介面的小圖 (例如 docs/zh-TW/*.png)。 -->
+## 預覽
+
+![濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex 停駐視窗](docs/images/preview-filters.jpg)
+*濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex 停駐視窗*
+
+![選擇 VST 外掛 (縮圖檢視)](docs/images/preview-browser.jpg)
+*選擇 VST 外掛 (縮圖檢視)*
 
 ## 建置
 

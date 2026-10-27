@@ -47,7 +47,13 @@ OBS Studio 用の拡張オーディオフィルタウィンドウです。**VST2
   半円イメージャー (任意)、画像として保存
 - ツール > VST Ex Audio Filter: 言語 (EN / JP / KR / ID / FR / TW)、バージョン、デバッグ情報
 
-<!-- スクリーンショット: ここに日本語 UI の小さい画像を追加 (例: docs/ja/*.png)。 -->
+## プレビュー
+
+![フィルタ (VST Ex) ウィンドウ、VST Ex Mixer ドック、VST Ex ドック](docs/images/preview-filters.jpg)
+*フィルタ (VST Ex) ウィンドウ、VST Ex Mixer ドック、VST Ex ドック*
+
+![VST プラグインの選択 (サムネイル表示)](docs/images/preview-browser.jpg)
+*VST プラグインの選択 (サムネイル表示)*
 
 ## ビルド
 
