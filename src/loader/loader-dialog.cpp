@@ -102,11 +102,13 @@ LoaderDialog::LoaderDialog(QWidget *parent) : QDialog(parent)
 	dataRow->addWidget(dataDir, 1);
 	dataRow->addWidget(changeDir);
 
-	// __DATE__ is "Oct 29 2026"; shown with year / month / day marked, so no order can be misread.
+	// __DATE__ is "Oct 29 2026"; shown with the month named (or year / month / day marked), so no order is misread.
 	QDate built = QLocale::c().toDate(QStringLiteral(__DATE__).simplified(), "MMM d yyyy");
 	auto *form = new QFormLayout();
 	form->addRow(T("Loader.Version"), selectable(QString::fromUtf8(PLUGIN_VERSION)));
-	form->addRow(T("Loader.BuildDate"), selectable(built.toString(T("Loader.BuildDate.Format"))));
+	form->addRow(T("Loader.BuildDate"), selectable(QLocale(PluginMeta::instance().uiValue("language").toString(
+								  QString::fromUtf8(obs_get_locale())))
+							  .toString(built, T("Loader.BuildDate.Format"))));
 	form->addRow(T("Loader.Author"), selectable(QStringLiteral("BlackDream feat. ChromeBread")));
 	auto *debug = new QCheckBox(T("Loader.Debug"), this);
 	debug->setToolTip(T("Loader.Debug.Tip"));

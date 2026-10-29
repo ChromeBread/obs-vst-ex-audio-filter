@@ -1,11 +1,11 @@
 ; Inno Setup 6.6+ script. Build: cmake --install to a stage folder, then
-;   iscc /DAppVersion=1.2.0 /DStageDir=<stage> installer\obs-vst-ex-audio-filter.iss
+;   iscc /DAppVersion=1.2.1 /DStageDir=<stage> installer\obs-vst-ex-audio-filter.iss
 ; Installs two OBS modules: VST Ex (obs-vst-ex-audio-filter) and VST Enigmax Loader (vst-enigmax-loader).
 ; The custom setup's choices go to install-features.ini, which VST Ex reads once at its next load.
 ; Uninstall asks what to keep; a backup it makes has the same layout as Tools > Debug mode > Backup.
 
 #ifndef AppVersion
-  #define AppVersion "1.2.0"
+  #define AppVersion "1.2.1"
 #endif
 #ifndef StageDir
   #define StageDir "..\build_x64\stage"
@@ -68,6 +68,13 @@ en.Strays=These files in the plugin's folders were not made by it (other files, 
 en.DeleteTicked=Delete ticked
 en.KeepAll=Keep all
 en.Exported=Backup saved to:%n%1
+en.StraysFound=%1 file(s) and %2 folder(s) in the plugin's folders were not made by it (other files, or renamed copies such as .bak / .org). Folders that are not ours are never opened or deleted.
+en.StraysKeep=Keep them and go on
+en.StraysChoose=Choose files to delete...
+en.StraysSave=Save the list and stop
+en.StraysSaved=The list was saved to:%n%1%n%nThe uninstall was stopped; nothing was removed.
+en.SelectAll=Select all
+en.SelectNone=Select none
 ja.TypeFull=フル インストール
 ja.TypeCustom=カスタム インストール
 ja.PartCore=VST Ex Audio Filter (必須): 右クリックの フィルタ (VST Ex)、ピッチ / 疑似ステレオ フィルタ、ツール > VST Ex Audio Filter
@@ -89,6 +96,13 @@ ja.Strays=プラグインのフォルダに、プラグインが作ったもの�
 ja.DeleteTicked=チェックしたものを削除
 ja.KeepAll=すべて残す
 ja.Exported=バックアップを保存しました:%n%1
+ja.StraysFound=プラグインのフォルダに、プラグインが作ったものではないファイルが %1 個、フォルダが %2 個あります (別のファイルや .bak / .org など名前を変えた複製)。プラグインのものではないフォルダは、中を開くことも削除することもしません。
+ja.StraysKeep=残して続ける
+ja.StraysChoose=削除するファイルを選ぶ...
+ja.StraysSave=一覧を保存して中止
+ja.StraysSaved=一覧を保存しました:%n%1%n%nアンインストールは中止しました。何も削除していません。
+ja.SelectAll=すべて選択
+ja.SelectNone=すべて解除
 fr.TypeFull=Installation complète
 fr.TypeCustom=Installation personnalisée
 fr.PartCore=VST Ex Audio Filter (requis) : Filtres (VST Ex) dans le clic droit, filtres hauteur / pseudo-stéréo, Outils > VST Ex Audio Filter
@@ -110,6 +124,13 @@ fr.Strays=Ces fichiers dans les dossiers du plugin n'ont pas été créés par l
 fr.DeleteTicked=Supprimer les cochés
 fr.KeepAll=Tout garder
 fr.Exported=Sauvegarde enregistrée dans :%n%1
+fr.StraysFound=%1 fichier(s) et %2 dossier(s) dans les dossiers du plugin n'ont pas été créés par lui (autres fichiers, ou copies renommées .bak / .org). Les dossiers qui ne sont pas à lui ne sont jamais ouverts ni supprimés.
+fr.StraysKeep=Les garder et continuer
+fr.StraysChoose=Choisir les fichiers à supprimer...
+fr.StraysSave=Enregistrer la liste et arrêter
+fr.StraysSaved=La liste a été enregistrée dans :%n%1%n%nLa désinstallation a été arrêtée ; rien n'a été supprimé.
+fr.SelectAll=Tout cocher
+fr.SelectNone=Tout décocher
 ko.TypeFull=전체 설치
 ko.TypeCustom=사용자 지정 설치
 ko.PartCore=VST Ex Audio Filter (필수): 우클릭 메뉴의 필터 (VST Ex), 피치 / 의사 스테레오 필터, 도구 > VST Ex Audio Filter
@@ -131,6 +152,13 @@ ko.Strays=플러그인 폴더에 플러그인이 만들지 않은 파일이 있�
 ko.DeleteTicked=체크한 파일 삭제
 ko.KeepAll=모두 유지
 ko.Exported=백업을 저장했습니다:%n%1
+ko.StraysFound=플러그인 폴더에 플러그인이 만들지 않은 파일 %1개와 폴더 %2개가 있습니다 (다른 파일이나 .bak / .org 같은 이름을 바꾼 복사본). 플러그인 것이 아닌 폴더는 열거나 삭제하지 않습니다.
+ko.StraysKeep=남기고 계속
+ko.StraysChoose=삭제할 파일 고르기...
+ko.StraysSave=목록 저장 후 중단
+ko.StraysSaved=목록을 저장했습니다:%n%1%n%n제거를 중단했습니다. 아무것도 삭제하지 않았습니다.
+ko.SelectAll=모두 선택
+ko.SelectNone=모두 해제
 
 [Types]
 Name: "full"; Description: "{cm:TypeFull}"
@@ -364,14 +392,7 @@ begin
   end;
 end;
 
-function InitializeUninstall: Boolean;
-begin
-  Result := WaitForObsClosed and ConfirmLoaderRemoval;
-  if Result and not UninstallSilent then
-    AskWhatToDelete;
-end;
-
-{ ---------- uninstall: files ---------- }
+{ ---------- uninstall: which files are ours ---------- }
 
 function IsHex(const S: String; AllowDash: Boolean): Boolean;
 var
@@ -404,107 +425,187 @@ begin
     Result := (Length(Base) = 40) and IsHex(Base, False);
 end;
 
-{ category: 1 thumbnails, 2 screenshots, 3 settings/history/presets, 0 not ours }
-function CategoryOf(const Folder, Name: String): Integer;
+{ Files the installer puts in a plugin folder, relative to it. Inno removes these itself. }
+function IsInstalledFile(const Rel: String): Boolean;
+var
+  N: String;
+begin
+  N := Lowercase(Rel);
+  Result := (N = 'bin\64bit\{#MainName}.dll') or (N = 'bin\64bit\{#MainName}.pdb') or
+            (N = 'bin\64bit\{#LoaderName}.dll') or (N = 'bin\64bit\{#LoaderName}.pdb') or
+            (N = 'bin\64bit\vst-ex-scanner.exe') or (Copy(N, 1, 15) = 'uninstall\unins') or
+            ((Copy(N, 1, 12) = 'data\locale\') and
+             (Pos(' ' + Copy(N, 13, MaxInt) + ' ', ' en-us.ini fr-fr.ini id-id.ini ja-jp.ini ko-kr.ini zh-tw.ini ') > 0));
+end;
+
+{ Subfolders the installer creates inside a plugin folder; any other subfolder is not ours. }
+function IsInstalledDir(const Rel: String): Boolean;
+var
+  N: String;
+begin
+  N := Lowercase(Rel);
+  Result := (N = 'bin') or (N = 'bin\64bit') or (N = 'data') or (N = 'data\locale') or (N = 'uninstall');
+end;
+
+{ category: 1 thumbnails, 2 screenshots, 3 settings/history/presets, 4 installed file, 0 not ours }
+function CategoryOf(const Kind, Rel: String): Integer;
 var
   N: String;
 begin
   Result := 0;
-  N := Lowercase(Name);
-  if Folder = 'thumbnails' then begin if IsOurPicture(N, False) then Result := 1; end
-  else if Folder = 'screenshots' then begin if IsOurPicture(N, True) then Result := 2; end
-  else if Folder = 'history' then begin
+  N := Lowercase(Rel);
+  if Kind = 'thumbnails' then begin if IsOurPicture(N, False) then Result := 1; end
+  else if Kind = 'screenshots' then begin if IsOurPicture(N, True) then Result := 2; end
+  else if Kind = 'history' then begin
     if (ExtractFileExt(N) = '.json') and (Length(N) = 36 + 5) and IsHex(Copy(N, 1, 36), True) then Result := 3; end
-  else if Folder = 'presets' then begin if N = 'chain-presets.json' then Result := 3; end
-  else if Folder = 'config' then begin
-    if (N = 'plugin-meta.json') or (N = 'plugin-cache.json') or (N = 'install-features.ini') then Result := 3; end;
+  else if Kind = 'presets' then begin if N = 'chain-presets.json' then Result := 3; end
+  else if Kind = 'config' then begin
+    if (N = 'plugin-meta.json') or (N = 'plugin-cache.json') or (N = 'install-features.ini') then Result := 3; end
+  else if Kind = 'plugin' then begin if IsInstalledFile(N) then Result := 4; end;
 end;
 
-procedure CopyTree(const FromDir, ToDir: String; TopOnly: Boolean);
+{ ---------- uninstall: the folders we look at ---------- }
+
 var
-  Rec: TFindRec;
+  Roots, Kinds: TStringList;   { folder + what kind of files belong there }
+  Strays: TStringList;         { files that are not ours (may be deleted, if the user ticks them) }
+  KeptDirs: TStringList;       { folders that are not ours: never opened, never deleted }
+  ToDelete: TStringList;       { strays the user ticked }
+
+procedure AddRoot(const Dir, Kind: String);
 begin
-  if FindFirst(FromDir + '\*', Rec) then
-  try
-    repeat
-      if (Rec.Name <> '.') and (Rec.Name <> '..') then
-        if (Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
-        begin
-          if not TopOnly then
-            CopyTree(FromDir + '\' + Rec.Name, ToDir + '\' + Rec.Name, False);
-        end
-        else
-        begin
-          ForceDirectories(ToDir);
-          FileCopy(FromDir + '\' + Rec.Name, ToDir + '\' + Rec.Name, False);
-        end;
-    until not FindNext(Rec);
-  finally
-    FindClose(Rec);
+  if (Dir <> '') and DirExists(Dir) and (Roots.IndexOf(Dir + '|' + Kind) < 0) then
+  begin
+    Roots.Add(Dir + '|' + Kind);
+    Kinds.Add(Kind);
   end;
 end;
 
-procedure ExportAll;
+procedure CollectRoots;
 var
-  Dest: String;
-  Ini: TArrayOfString;
+  MainData, LoaderData: String;
 begin
-  Dest := ExportDir + '\VST-Ex-backup-' + GetDateTimeString('yyyymmdd-hhnnss', #0, #0);
-  CopyTree(ConfigDir('{#MainName}'), Dest + '\config\{#MainName}', True);
-  CopyTree(ConfigDir('{#LoaderName}'), Dest + '\config\{#LoaderName}', True);
-  CopyTree(DataDirOf('{#LoaderName}') + '\thumbnails', Dest + '\data\thumbnails', False);
-  CopyTree(DataDirOf('{#LoaderName}') + '\screenshots', Dest + '\data\screenshots', False);
-  CopyTree(DataDirOf('{#MainName}') + '\history', Dest + '\data\history', False);
-  CopyTree(DataDirOf('{#MainName}') + '\presets', Dest + '\data\presets', False);
-  SetArrayLength(Ini, 2);
-  Ini[0] := '[backup]';
-  Ini[1] := 'version=1';
-  SaveStringsToUTF8FileWithoutBOM(Dest + '\vst-ex-backup.ini', Ini, False);
-  MsgBox(FmtMessage(CustomMessage('Exported'), [Dest]), mbInformation, MB_OK);
+  MainData := DataDirOf('{#MainName}');
+  LoaderData := DataDirOf('{#LoaderName}');
+  AddRoot(ConfigDir('{#MainName}'), 'config');
+  AddRoot(ConfigDir('{#LoaderName}'), 'config');
+  AddRoot(LoaderData + '\thumbnails', 'thumbnails');
+  AddRoot(LoaderData + '\screenshots', 'screenshots');
+  AddRoot(MainData + '\history', 'history');
+  AddRoot(MainData + '\presets', 'presets');
+  AddRoot(ExpandConstant('{app}\{#MainName}'), 'plugin');
+  AddRoot(ExpandConstant('{app}\{#LoaderName}'), 'plugin');
 end;
 
-var
-  Strays: TStringList;
+function RootDir(I: Integer): String;
+begin
+  Result := Copy(Roots[I], 1, Pos('|', Roots[I]) - 1);
+end;
 
-{ Deletes our files of the ticked categories in Dir; anything not ours goes on the stray list. }
-procedure SweepFolder(const Dir, Folder: String; Recurse: Boolean);
+{ Lists what is not ours in one root. Only a plugin folder's own subfolders are entered; any other folder
+  (a config or data folder can hold the user's own) is noted as kept and its contents are never looked at. }
+procedure ScanDir(const Root, Kind, Rel: String);
 var
   Rec: TFindRec;
-  Cat: Integer;
+  Path, Sub: String;
 begin
-  if FindFirst(Dir + '\*', Rec) then
+  Path := Root;
+  if Rel <> '' then
+    Path := Root + '\' + Rel;
+  if FindFirst(Path + '\*', Rec) then
   try
     repeat
       if (Rec.Name = '.') or (Rec.Name = '..') then
         Continue;
+      Sub := Rec.Name;
+      if Rel <> '' then
+        Sub := Rel + '\' + Rec.Name;
       if (Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
       begin
-        if Recurse and not ((Folder = 'plugin') and (Lowercase(Rec.Name) = 'uninstall')) then
-          SweepFolder(Dir + '\' + Rec.Name, Folder, True);
-        Continue;
-      end;
-      Cat := CategoryOf(Folder, Rec.Name);
-      if Cat = 0 then
-        Strays.Add(Dir + '\' + Rec.Name)
-      else if ((Cat = 1) and DelThumbs) or ((Cat = 2) and DelShots) or ((Cat = 3) and DelSettings) then
-        DeleteFile(Dir + '\' + Rec.Name);
+        if (Kind = 'plugin') and IsInstalledDir(Sub) then
+          ScanDir(Root, Kind, Sub)
+        else if (Kind <> 'config') or ((Lowercase(Sub) <> 'thumbnails') and (Lowercase(Sub) <> 'screenshots') and
+                (Lowercase(Sub) <> 'history') and (Lowercase(Sub) <> 'presets')) then
+          KeptDirs.Add(Root + '\' + Sub); { the data folders inside a config folder are roots of their own }
+      end
+      else if CategoryOf(Kind, Sub) = 0 then
+        Strays.Add(Root + '\' + Sub);
     until not FindNext(Rec);
   finally
     FindClose(Rec);
   end;
 end;
 
-procedure AskAboutStrays;
+{ Deletes our files of the ticked categories in a root (its top level only; our files are never deeper). }
+procedure DeleteOurs(const Root, Kind: String);
+var
+  Rec: TFindRec;
+  Cat: Integer;
+begin
+  if Kind = 'plugin' then
+    Exit; { Inno removes the installed files itself }
+  if FindFirst(Root + '\*', Rec) then
+  try
+    repeat
+      if (Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        Continue;
+      Cat := CategoryOf(Kind, Rec.Name);
+      if ((Cat = 1) and DelThumbs) or ((Cat = 2) and DelShots) or ((Cat = 3) and DelSettings) then
+        DeleteFile(Root + '\' + Rec.Name);
+    until not FindNext(Rec);
+  finally
+    FindClose(Rec);
+  end;
+end;
+
+{ ---------- uninstall: asking ---------- }
+
+function SaveStrayList: String;
+var
+  Lines: TArrayOfString;
+  I, N: Integer;
+begin
+  Result := ExpandConstant('{userdesktop}\VST-Ex-uninstall-leftovers.txt');
+  SetArrayLength(Lines, Strays.Count + KeptDirs.Count + 4);
+  N := 0;
+  Lines[N] := '[files]'; N := N + 1;
+  for I := 0 to Strays.Count - 1 do begin Lines[N] := Strays[I]; N := N + 1; end;
+  Lines[N] := ''; N := N + 1;
+  Lines[N] := '[folders]'; N := N + 1;
+  for I := 0 to KeptDirs.Count - 1 do begin Lines[N] := KeptDirs[I]; N := N + 1; end;
+  SaveStringsToUTF8File(Result, Lines, False);
+end;
+
+procedure SetAll(List: TNewCheckListBox; On: Boolean);
+var
+  I: Integer;
+begin
+  for I := 0 to List.Items.Count - 1 do
+    List.Checked[I] := On;
+end;
+
+var
+  StrayList: TNewCheckListBox;
+
+procedure SelectAllClick(Sender: TObject);
+begin
+  SetAll(StrayList, True);
+end;
+
+procedure SelectNoneClick(Sender: TObject);
+begin
+  SetAll(StrayList, False);
+end;
+
+{ Tick the strays to delete; nothing is ticked at first. }
+procedure ChooseStrays;
 var
   Form: TSetupForm;
   Text: TNewStaticText;
-  List: TNewCheckListBox;
-  Del, Keep: TNewButton;
+  All, None, Del, Keep: TNewButton;
   I: Integer;
 begin
-  if Strays.Count = 0 then
-    Exit;
-  Form := CreateCustomForm(ScaleX(560), ScaleY(340), True, True);
+  Form := CreateCustomForm(ScaleX(620), ScaleY(400), True, True);
   try
     Form.Caption := CustomMessage('KeepTitle');
     Text := TNewStaticText.Create(Form);
@@ -516,91 +617,182 @@ begin
     Text.AutoSize := False;
     Text.WordWrap := True;
     Text.Caption := CustomMessage('Strays');
-    List := TNewCheckListBox.Create(Form);
-    List.Parent := Form;
-    List.Left := ScaleX(12);
-    List.Top := ScaleY(58);
-    List.Width := Form.ClientWidth - ScaleX(24);
-    List.Height := Form.ClientHeight - ScaleY(58) - ScaleY(46);
+    StrayList := TNewCheckListBox.Create(Form);
+    StrayList.Parent := Form;
+    StrayList.Left := ScaleX(12);
+    StrayList.Top := ScaleY(58);
+    StrayList.Width := Form.ClientWidth - ScaleX(24);
+    StrayList.Height := Form.ClientHeight - ScaleY(58) - ScaleY(46);
     for I := 0 to Strays.Count - 1 do
-      List.AddCheckBox(Strays[I], '', 0, False, True, False, False, nil);
-    Del := TNewButton.Create(Form);
-    Del.Parent := Form;
-    Del.Caption := CustomMessage('DeleteTicked');
-    Del.ModalResult := mrOk;
-    Del.Width := ScaleX(160);
-    Del.Height := ScaleY(25);
-    Del.Top := Form.ClientHeight - Del.Height - ScaleY(10);
-    Del.Left := Form.ClientWidth - ScaleX(12) - ScaleX(100) - ScaleX(8) - Del.Width;
+      StrayList.AddCheckBox(Strays[I], '', 0, False, True, False, False, nil);
+    All := TNewButton.Create(Form);
+    All.Parent := Form;
+    All.Caption := CustomMessage('SelectAll');
+    All.Width := ScaleX(100);
+    All.Height := ScaleY(25);
+    All.Left := ScaleX(12);
+    All.Top := Form.ClientHeight - All.Height - ScaleY(10);
+    All.OnClick := @SelectAllClick;
+    None := TNewButton.Create(Form);
+    None.Parent := Form;
+    None.Caption := CustomMessage('SelectNone');
+    None.Width := ScaleX(100);
+    None.Height := ScaleY(25);
+    None.Left := All.Left + All.Width + ScaleX(8);
+    None.Top := All.Top;
+    None.OnClick := @SelectNoneClick;
     Keep := TNewButton.Create(Form);
     Keep.Parent := Form;
     Keep.Caption := CustomMessage('KeepAll');
     Keep.ModalResult := mrCancel;
     Keep.Width := ScaleX(100);
     Keep.Height := ScaleY(25);
-    Keep.Top := Del.Top;
+    Keep.Top := All.Top;
     Keep.Left := Form.ClientWidth - ScaleX(12) - Keep.Width;
+    Del := TNewButton.Create(Form);
+    Del.Parent := Form;
+    Del.Caption := CustomMessage('DeleteTicked');
+    Del.ModalResult := mrOk;
+    Del.Width := ScaleX(160);
+    Del.Height := ScaleY(25);
+    Del.Top := All.Top;
+    Del.Left := Keep.Left - ScaleX(8) - Del.Width;
+    Form.ActiveControl := Keep;
     if Form.ShowModal = mrOk then
       for I := 0 to Strays.Count - 1 do
-        if List.Checked[I] then
-          DeleteFile(Strays[I]);
+        if StrayList.Checked[I] then
+          ToDelete.Add(Strays[I]);
   finally
     Form.Free;
   end;
 end;
 
-procedure RemoveEmptyDirs(const Dir: String);
+{ False = stop the uninstall (the list was saved for the user to look at). }
+function AskAboutStrays: Boolean;
+var
+  Labels: TArrayOfString;
+  Choice: Integer;
+begin
+  Result := True;
+  if (Strays.Count = 0) and (KeptDirs.Count = 0) then
+    Exit;
+  SetArrayLength(Labels, 3);
+  Labels[0] := CustomMessage('StraysKeep');
+  Labels[1] := CustomMessage('StraysChoose');
+  Labels[2] := CustomMessage('StraysSave');
+  Choice := TaskDialogMsgBox(CustomMessage('KeepTitle'),
+    FmtMessage(CustomMessage('StraysFound'), [IntToStr(Strays.Count), IntToStr(KeptDirs.Count)]),
+    mbConfirmation, MB_YESNOCANCEL, Labels, 0);
+  if Choice = IDNO then
+  begin
+    if Strays.Count > 0 then
+      ChooseStrays;
+  end
+  else if Choice = IDCANCEL then
+  begin
+    MsgBox(FmtMessage(CustomMessage('StraysSaved'), [SaveStrayList]), mbInformation, MB_OK);
+    Result := False;
+  end;
+end;
+
+{ ---------- uninstall: copying and removing ---------- }
+
+procedure CopyFiles(const FromDir, ToDir: String);
 var
   Rec: TFindRec;
 begin
-  if FindFirst(Dir + '\*', Rec) then
+  if FindFirst(FromDir + '\*', Rec) then
   try
     repeat
-      if (Rec.Name <> '.') and (Rec.Name <> '..') and ((Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) then
-        RemoveEmptyDirs(Dir + '\' + Rec.Name);
+      if (Rec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+      begin
+        ForceDirectories(ToDir);
+        FileCopy(FromDir + '\' + Rec.Name, ToDir + '\' + Rec.Name, False);
+      end;
     until not FindNext(Rec);
   finally
     FindClose(Rec);
   end;
-  RemoveDir(Dir); { only succeeds when empty }
+end;
+
+{ Same layout as Tools > VST Ex Audio Filter > Debug mode > Backup. Only top-level files: ours are never deeper,
+  and folders that are not ours (possibly huge) are not dragged along. }
+procedure ExportAll;
+var
+  Dest: String;
+  Ini: TArrayOfString;
+begin
+  Dest := ExportDir + '\VST-Ex-backup-' + GetDateTimeString('yyyymmdd-hhnnss', #0, #0);
+  CopyFiles(ConfigDir('{#MainName}'), Dest + '\config\{#MainName}');
+  CopyFiles(ConfigDir('{#LoaderName}'), Dest + '\config\{#LoaderName}');
+  CopyFiles(DataDirOf('{#LoaderName}') + '\thumbnails', Dest + '\data\thumbnails');
+  CopyFiles(DataDirOf('{#LoaderName}') + '\screenshots', Dest + '\data\screenshots');
+  CopyFiles(DataDirOf('{#MainName}') + '\history', Dest + '\data\history');
+  CopyFiles(DataDirOf('{#MainName}') + '\presets', Dest + '\data\presets');
+  SetArrayLength(Ini, 2);
+  Ini[0] := '[backup]';
+  Ini[1] := 'version=1';
+  SaveStringsToUTF8FileWithoutBOM(Dest + '\vst-ex-backup.ini', Ini, False);
+  MsgBox(FmtMessage(CustomMessage('Exported'), [Dest]), mbInformation, MB_OK);
+end;
+
+{ Removes the folders we made, deepest first, and only when empty: anything left inside keeps its folder. }
+procedure RemoveOurEmptyDirs;
+var
+  I: Integer;
+  Dir: String;
+begin
+  for I := Roots.Count - 1 downto 0 do
+  begin
+    Dir := RootDir(I);
+    if Kinds[I] = 'plugin' then
+    begin
+      RemoveDir(Dir + '\bin\64bit');
+      RemoveDir(Dir + '\bin');
+      RemoveDir(Dir + '\data\locale');
+      RemoveDir(Dir + '\data');
+      RemoveDir(Dir + '\uninstall');
+    end;
+    RemoveDir(Dir);
+  end;
+end;
+
+{ ---------- uninstall: flow ---------- }
+
+function InitializeUninstall: Boolean;
+var
+  I: Integer;
+begin
+  Result := WaitForObsClosed and ConfirmLoaderRemoval;
+  if not Result then
+    Exit;
+  Roots := TStringList.Create;
+  Kinds := TStringList.Create;
+  Strays := TStringList.Create;
+  KeptDirs := TStringList.Create;
+  ToDelete := TStringList.Create;
+  CollectRoots;
+  if UninstallSilent then
+    Exit; { silent: keep everything that is not ours, delete nothing extra }
+  { Looked at before anything is removed, so the uninstall can still stop cleanly here. }
+  for I := 0 to Roots.Count - 1 do
+    ScanDir(RootDir(I), Kinds[I], '');
+  Result := AskAboutStrays;
+  if Result then
+    AskWhatToDelete;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Main, Loader, MainData, LoaderData: String;
+  I: Integer;
 begin
   if CurUninstallStep <> usPostUninstall then
     Exit;
-  Main := ConfigDir('{#MainName}');
-  Loader := ConfigDir('{#LoaderName}');
-  MainData := DataDirOf('{#MainName}');
-  LoaderData := DataDirOf('{#LoaderName}');
   if ExportFirst and (DelThumbs or DelShots or DelSettings) then
     ExportAll;
-  Strays := TStringList.Create;
-  try
-    Strays.Duplicates := dupIgnore;
-    Strays.Sorted := True;
-    SweepFolder(Main, 'config', False);
-    SweepFolder(Loader, 'config', False);
-    SweepFolder(LoaderData + '\thumbnails', 'thumbnails', True);
-    SweepFolder(LoaderData + '\screenshots', 'screenshots', True);
-    SweepFolder(MainData + '\history', 'history', True);
-    SweepFolder(MainData + '\presets', 'presets', True);
-    { Whatever is still in the plugin folders after uninstall was not installed by us. }
-    SweepFolder(ExpandConstant('{app}\{#MainName}'), 'plugin', True);
-    SweepFolder(ExpandConstant('{app}\{#LoaderName}'), 'plugin', True);
-    if not UninstallSilent then
-      AskAboutStrays;
-  finally
-    Strays.Free;
-  end;
-  RemoveEmptyDirs(LoaderData + '\thumbnails');
-  RemoveEmptyDirs(LoaderData + '\screenshots');
-  RemoveEmptyDirs(MainData + '\history');
-  RemoveEmptyDirs(MainData + '\presets');
-  RemoveEmptyDirs(Main);
-  RemoveEmptyDirs(Loader);
-  RemoveEmptyDirs(ExpandConstant('{app}\{#MainName}'));
-  RemoveEmptyDirs(ExpandConstant('{app}\{#LoaderName}'));
+  for I := 0 to Roots.Count - 1 do
+    DeleteOurs(RootDir(I), Kinds[I]);
+  for I := 0 to ToDelete.Count - 1 do
+    DeleteFile(ToDelete[I]);
+  RemoveOurEmptyDirs;
 end;

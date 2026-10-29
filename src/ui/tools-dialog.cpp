@@ -224,7 +224,7 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	form->addRow(T("Tools.Version"), selectable(QString::fromUtf8(PLUGIN_VERSION)));
 	// __DATE__ is "Oct 27 2026" (English, ambiguous order for some readers); parse it, then format per language.
 	QDate built = QLocale::c().toDate(QStringLiteral(__DATE__).simplified(), "MMM d yyyy");
-	// Per-language pattern with year, month and day marked (e.g. "yyyy'年'-M'月'-d'日'"), so no order is misread.
+	// Per-language pattern that cannot be misread: month names ("MMMM d, yyyy") or marked units ("yyyy'年'M'月'd'日'").
 	QString builtText = QLocale(currentLanguage()).toString(built, T("Tools.BuildDate.Format"));
 	form->addRow(T("Tools.BuildDate"), selectable(builtText + "  " + QStringLiteral(__TIME__).left(5)));
 	form->addRow(T("Tools.Author"), selectable(QStringLiteral("BlackDream feat. ChromeBread")));
