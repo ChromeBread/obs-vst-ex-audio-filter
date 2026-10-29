@@ -71,11 +71,32 @@ ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `obs-vst-ex-audio-filter`
 
 ## Pratinjau
 
-![Jendela Filter (VST Ex), dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-filters.jpg)
-*Jendela Filter (VST Ex), dock VST Ex Mixer dan VST Ex Switcher*
+![OBS dengan dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-obs.png)
+*OBS dengan dock VST Ex Mixer dan VST Ex Switcher*
 
-![Pilih Plugin VST (tampilan gambar mini)](docs/images/preview-browser.jpg)
+![Jendela Filter (VST Ex)](docs/images/preview-filters.png)
+*Jendela Filter (VST Ex)*
+
+![Jendela Filter (VST Ex), beberapa filter dipilih](docs/images/preview-filters-select.png)
+*Jendela Filter (VST Ex), beberapa filter dipilih*
+
+![Riwayat](docs/images/preview-history.png)
+*Riwayat*
+
+![Sync Offset dari 4 ketukan](docs/images/preview-sync.png)
+*Sync Offset dari 4 ketukan*
+
+![Pilih Plugin VST (tampilan gambar mini)](docs/images/preview-browser-thumbnails.png)
 *Pilih Plugin VST (tampilan gambar mini)*
+
+![Pilih Plugin VST (tampilan daftar)](docs/images/preview-browser-list.png)
+*Pilih Plugin VST (tampilan daftar)*
+
+![Pilih Plugin VST (tampilan detail)](docs/images/preview-browser-details.png)
+*Pilih Plugin VST (tampilan detail)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## Build
 

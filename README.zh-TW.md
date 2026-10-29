@@ -66,11 +66,32 @@ VST 濾鏡屬於 VST Enigmax Loader，移除它後 OBS 就無法載入這些濾�
 
 ## 預覽
 
-![濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex Switcher 停駐視窗](docs/images/preview-filters.jpg)
-*濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex Switcher 停駐視窗*
+![放置 VST Ex Mixer 與 VST Ex Switcher 停駐視窗的 OBS](docs/images/preview-obs.png)
+*放置 VST Ex Mixer 與 VST Ex Switcher 停駐視窗的 OBS*
 
-![選擇 VST 外掛 (縮圖檢視)](docs/images/preview-browser.jpg)
+![濾鏡 (VST Ex) 視窗](docs/images/preview-filters.png)
+*濾鏡 (VST Ex) 視窗*
+
+![濾鏡 (VST Ex) 視窗，多重選取](docs/images/preview-filters-select.png)
+*濾鏡 (VST Ex) 視窗，多重選取*
+
+![歷史記錄](docs/images/preview-history.png)
+*歷史記錄*
+
+![以四拍測量 Sync Offset](docs/images/preview-sync.png)
+*以四拍測量 Sync Offset*
+
+![選擇 VST 外掛 (縮圖檢視)](docs/images/preview-browser-thumbnails.png)
 *選擇 VST 外掛 (縮圖檢視)*
+
+![選擇 VST 外掛 (清單檢視)](docs/images/preview-browser-list.png)
+*選擇 VST 外掛 (清單檢視)*
+
+![選擇 VST 外掛 (詳細資料檢視)](docs/images/preview-browser-details.png)
+*選擇 VST 外掛 (詳細資料檢視)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## 建置
 

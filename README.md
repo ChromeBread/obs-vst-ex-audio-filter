@@ -70,11 +70,32 @@ folders (hand VST filters over first, see below).
 
 ## Preview
 
-![Filters (VST Ex) window, VST Ex Mixer and VST Ex Switcher docks](docs/images/preview-filters.jpg)
-*Filters (VST Ex) window, VST Ex Mixer and VST Ex Switcher docks*
+![OBS with the VST Ex Mixer and VST Ex Switcher docks](docs/images/preview-obs.png)
+*OBS with the VST Ex Mixer and VST Ex Switcher docks*
 
-![Choose a VST Plugin (thumbnail view)](docs/images/preview-browser.jpg)
+![Filters (VST Ex) window](docs/images/preview-filters.png)
+*Filters (VST Ex) window*
+
+![Filters (VST Ex) window, several filters selected](docs/images/preview-filters-select.png)
+*Filters (VST Ex) window, several filters selected*
+
+![History](docs/images/preview-history.png)
+*History*
+
+![Sync Offset from 4 beats](docs/images/preview-sync.png)
+*Sync Offset from 4 beats*
+
+![Choose a VST Plugin (thumbnail view)](docs/images/preview-browser-thumbnails.png)
 *Choose a VST Plugin (thumbnail view)*
+
+![Choose a VST Plugin (list view)](docs/images/preview-browser-list.png)
+*Choose a VST Plugin (list view)*
+
+![Choose a VST Plugin (details view)](docs/images/preview-browser-details.png)
+*Choose a VST Plugin (details view)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## Build
 

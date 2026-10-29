@@ -70,11 +70,32 @@ VST 필터는 VST Enigmax Loader 소속이므로, 이것을 제거하면 OBS가 
 
 ## 미리 보기
 
-![필터 (VST Ex) 창, VST Ex Mixer 도크, VST Ex Switcher 도크](docs/images/preview-filters.jpg)
-*필터 (VST Ex) 창, VST Ex Mixer 도크, VST Ex Switcher 도크*
+![VST Ex Mixer 도크와 VST Ex Switcher 도크를 둔 OBS](docs/images/preview-obs.png)
+*VST Ex Mixer 도크와 VST Ex Switcher 도크를 둔 OBS*
 
-![VST 플러그인 선택 (썸네일 보기)](docs/images/preview-browser.jpg)
+![필터 (VST Ex) 창](docs/images/preview-filters.png)
+*필터 (VST Ex) 창*
+
+![필터 (VST Ex) 창, 여러 개 선택](docs/images/preview-filters-select.png)
+*필터 (VST Ex) 창, 여러 개 선택*
+
+![기록](docs/images/preview-history.png)
+*기록*
+
+![4비트로 Sync Offset 측정](docs/images/preview-sync.png)
+*4비트로 Sync Offset 측정*
+
+![VST 플러그인 선택 (썸네일 보기)](docs/images/preview-browser-thumbnails.png)
 *VST 플러그인 선택 (썸네일 보기)*
+
+![VST 플러그인 선택 (목록 보기)](docs/images/preview-browser-list.png)
+*VST 플러그인 선택 (목록 보기)*
+
+![VST 플러그인 선택 (자세히 보기)](docs/images/preview-browser-details.png)
+*VST 플러그인 선택 (자세히 보기)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## 빌드
 

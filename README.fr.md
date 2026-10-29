@@ -71,11 +71,32 @@ supprimez les dossiers (transférez d'abord les filtres VST, voir plus bas).
 
 ## Aperçu
 
-![Fenêtre Filtres (VST Ex), docks VST Ex Mixer et VST Ex Switcher](docs/images/preview-filters.jpg)
-*Fenêtre Filtres (VST Ex), docks VST Ex Mixer et VST Ex Switcher*
+![OBS avec les docks VST Ex Mixer et VST Ex Switcher](docs/images/preview-obs.png)
+*OBS avec les docks VST Ex Mixer et VST Ex Switcher*
 
-![Choisir un plugin VST (vue miniatures)](docs/images/preview-browser.jpg)
+![Fenêtre Filtres (VST Ex)](docs/images/preview-filters.png)
+*Fenêtre Filtres (VST Ex)*
+
+![Fenêtre Filtres (VST Ex), plusieurs filtres sélectionnés](docs/images/preview-filters-select.png)
+*Fenêtre Filtres (VST Ex), plusieurs filtres sélectionnés*
+
+![Historique](docs/images/preview-history.png)
+*Historique*
+
+![Sync Offset sur 4 temps](docs/images/preview-sync.png)
+*Sync Offset sur 4 temps*
+
+![Choisir un plugin VST (vue miniatures)](docs/images/preview-browser-thumbnails.png)
 *Choisir un plugin VST (vue miniatures)*
+
+![Choisir un plugin VST (vue liste)](docs/images/preview-browser-list.png)
+*Choisir un plugin VST (vue liste)*
+
+![Choisir un plugin VST (vue détails)](docs/images/preview-browser-details.png)
+*Choisir un plugin VST (vue détails)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## Compilation
 

@@ -70,11 +70,32 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
 
 ## プレビュー
 
-![フィルタ (VST Ex) ウィンドウ、VST Ex Mixer ドック、VST Ex Switcher ドック](docs/images/preview-filters.jpg)
-*フィルタ (VST Ex) ウィンドウ、VST Ex Mixer ドック、VST Ex Switcher ドック*
+![VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS](docs/images/preview-obs.png)
+*VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS*
 
-![VST プラグインの選択 (サムネイル表示)](docs/images/preview-browser.jpg)
+![フィルタ (VST Ex) ウィンドウ](docs/images/preview-filters.png)
+*フィルタ (VST Ex) ウィンドウ*
+
+![フィルタ (VST Ex) ウィンドウ、複数選択](docs/images/preview-filters-select.png)
+*フィルタ (VST Ex) ウィンドウ、複数選択*
+
+![履歴](docs/images/preview-history.png)
+*履歴*
+
+![4つ打ちで Sync Offset を測定](docs/images/preview-sync.png)
+*4つ打ちで Sync Offset を測定*
+
+![VST プラグインの選択 (サムネイル表示)](docs/images/preview-browser-thumbnails.png)
 *VST プラグインの選択 (サムネイル表示)*
+
+![VST プラグインの選択 (リスト表示)](docs/images/preview-browser-list.png)
+*VST プラグインの選択 (リスト表示)*
+
+![VST プラグインの選択 (詳細表示)](docs/images/preview-browser-details.png)
+*VST プラグインの選択 (詳細表示)*
+
+![VST Ex Chain View](docs/images/preview-chain.png)
+*VST Ex Chain View*
 
 ## ビルド
 
