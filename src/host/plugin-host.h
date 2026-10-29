@@ -43,6 +43,10 @@ public:
 
 	virtual std::vector<uint8_t> getState() = 0;
 	virtual bool setState(const std::vector<uint8_t> &state) = 0;
+	// VST2 only, for moving filters to and from OBS's own "VST 2.x Plug-in" filter: it keeps the current
+	// program's chunk (effGetChunk index 1), or the raw float parameters when the plugin has no chunks.
+	virtual std::vector<uint8_t> getObsVstData() { return {}; }
+	virtual void setObsVstData(const std::vector<uint8_t> &) {}
 
 	virtual bool hasEditor() = 0;
 	// parent is an HWND. width/height receive the initial editor size.

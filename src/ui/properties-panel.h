@@ -42,6 +42,7 @@ private:
 	void changed(obs_property_t *prop);
 	void scheduleRebuild();
 	void addPluginPicture(QVBoxLayout *layout);
+	static void onPicturesChanged(void *param, calldata_t *cd);
 
 	OBSSource src;
 	OBSDataAutoRelease settings;

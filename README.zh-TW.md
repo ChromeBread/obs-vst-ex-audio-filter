@@ -2,21 +2,36 @@
 
 # OBS VST Ex Audio Filter
 
-OBS Studio 的擴充音訊濾鏡視窗，內建 **VST2 / VST3** 外掛支援、適合歌唱直播的瞬間 ON/OFF 切換、延遲工具與濾鏡鏈圖。
-它與 OBS 原生「濾鏡」視窗操作同一條濾鏡鏈，兩者可以互相搭配使用。
+OBS Studio 的擴充音訊濾鏡視窗，具備歌唱直播用的即時 ON/OFF 切換、延遲量測與鏈狀圖，並附帶自有的
+**VST2 / VST3** 主機 **VST Enigmax Loader**。「濾鏡 (VST Ex)」視窗與 OBS 內建「濾鏡」視窗處理同一條濾鏡鏈，
+兩邊都能操作。
+
+會安裝兩個 OBS 外掛: **VST Ex** (視窗、停駐視窗與內建濾鏡) 與 **VST Enigmax Loader** (VST 主機)。
+VST 濾鏡屬於 VST Enigmax Loader，移除它後 OBS 就無法載入這些濾鏡。移除前請先用「移交」(見下方)
+移到 OBS 內建的 VST 2.x 濾鏡或 atkAudio。
 
 - Windows x64，OBS Studio 31 以上 (已在 33.0 測試)
 - 製作者: BlackDream feat. ChromeBread · 授權: GPL-2.0
 
 ## 安裝
 
-1. 從 [Releases](../../releases) 下載 `obs-vst-ex-audio-filter-1.0.0-windows-x64.zip`。
-2. 關閉 OBS，把 zip 解壓縮到 `C:\ProgramData\obs-studio\plugins\`
-   (會得到 `C:\ProgramData\obs-studio\plugins\obs-vst-ex-audio-filter\bin\64bit\...`)。
-3. 啟動 OBS。第一次啟動時會詢問縮圖、截圖與紀錄的儲存位置。
+1. 從 [Releases](../../releases) 下載 `obs-vst-ex-audio-filter-<版本>-windows-x64-setup.exe`。
+2. 關閉 OBS 後執行。「完整安裝」安裝全部；「自訂安裝」可選擇:
+   - VST Ex Audio Filter (必要):「濾鏡 (VST Ex)」、音高 / 偽立體聲濾鏡、工具 > VST Ex Audio Filter
+   - VST Enigmax Loader: VST2 / VST3 外掛
+   - VST Ex Chain View、VST Ex Mixer 停駐視窗、VST Ex Switcher 停駐視窗
 
-解除安裝: 關閉 OBS 後刪除該 `obs-vst-ex-audio-filter` 資料夾
-(工具 > VST Ex Audio Filter > 除錯模式 會列出所有要刪除的資料夾)。
+   VST Ex 的選用部分之後可在 工具 > VST Ex Audio Filter 開關 (重新啟動 OBS 後生效)。
+3. 啟動 OBS。第一次啟動時會詢問縮圖、截圖與歷程的儲存位置。
+
+**免安裝版**: `obs-vst-ex-audio-filter-<版本>-windows-x64-portable.zip`。關閉 OBS 後解壓縮到
+`C:\ProgramData\obs-studio\plugins\`，會得到 `obs-vst-ex-audio-filter` (VST Ex) 與 `vst-enigmax-loader`
+(VST Enigmax Loader) 兩個資料夾。不需要的資料夾可以不放。移除時關閉 OBS 並刪除資料夾即可 (請先移交 VST 濾鏡，見下方)。
+
+**解除安裝** (Windows 設定 > 應用程式 > OBS VST Ex Audio Filter)。解除安裝程式會:
+1. 若場景集合仍使用 VST Enigmax Loader 濾鏡就發出警告，讓你先移交
+2. 分別詢問是否刪除外掛縮圖、高解析度截圖，以及設定 / 預設 / 歷程 (也可選「全部匯出後再刪除」)
+3. 若資料夾中有不是它建立的檔案 (其他檔案、`.bak` / `.org` 等改名的副本)，會列出清單讓你逐一刪除或保留
 
 ## 功能
 
@@ -29,26 +44,30 @@ OBS Studio 的擴充音訊濾鏡視窗，內建 **VST2 / VST3** 外掛支援、�
 - **以四拍測量**: 播放 BPM120 測試曲，跟著拍手 (或把耳機貼在麥克風上) 即可算出同步偏移；
   可縮放、附毫秒刻度的波形，方便手動微調
 
-**VST 外掛**
+**VST Enigmax Loader** (VST2 / VST3)
 - VST2 與 VST3，在獨立程序中安全掃描 (手動開始，附預估時間)
 - 清單 / 縮圖 / 詳細檢視的瀏覽器，排序、搜尋、我的最愛、HID (隱藏) 標記、備註、最近使用
 - 第一次開啟編輯器時自動擷取縮圖，也可一次全部產生；每個濾鏡的個別截圖
 - 在編輯器視窗匯出 / 匯入外掛設定
+- **移交** (工具 > VST Enigmax Loader > 除錯模式): 將 VST 濾鏡連同設定原地移到 OBS 內建「VST 2.x 外掛」濾鏡 (VST2)
+  或「atkAudio PluginHost」(VST3)，也可反向移回
+- 縮圖與高解析度截圖分開存放在不同資料夾
 
 **內建濾鏡**
 -「VST Ex 移調 / 聲像」: 以半音為單位的音高與聲像，對齊裝置時容易分辨
 -「VST Ex 假立體聲」: 不用 DAW 就能讓單聲道麥克風變寬 (哈斯效應)，一個濾鏡即可新增或移除
 
 **停駐視窗與工具**
--「VST Ex」停駐視窗: ON/OFF 組合按鈕與 CPU 使用率 (OBS 整體與 VST 部分)
+-「VST Ex Switcher」停駐視窗: ON/OFF 組合按鈕與 CPU 使用率 (OBS 整體與 VST 部分)
 -「VST Ex Mixer」停駐視窗: 在音訊混音器音量表下方，每個來源一欄、每個 VST 一個按鈕
 -「VST Ex Chain View」(工具選單): 從裝置到輸出的所有來源、延遲、音量、側鏈、半圓聲像儀 (可選)、另存為圖片
-- 工具 > VST Ex Audio Filter: 語言 (EN / JP / KR / ID / FR / TW)、版本、除錯資訊
+- 工具 > VST Ex Audio Filter: 語言 (EN / JP / KR / ID / FR / TW)、版本、選用部分開關、除錯資訊、
+  匯出 / 匯入所有設定 (除錯模式)
 
 ## 預覽
 
-![濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex 停駐視窗](docs/images/preview-filters.jpg)
-*濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex 停駐視窗*
+![濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex Switcher 停駐視窗](docs/images/preview-filters.jpg)
+*濾鏡 (VST Ex) 視窗、VST Ex Mixer 與 VST Ex Switcher 停駐視窗*
 
 ![選擇 VST 外掛 (縮圖檢視)](docs/images/preview-browser.jpg)
 *選擇 VST 外掛 (縮圖檢視)*
@@ -57,3 +76,5 @@ OBS Studio 的擴充音訊濾鏡視窗，內建 **VST2 / VST3** 外掛支援、�
 
 Visual Studio 2022 與 CMake 3.28 以上: `cmake --preset windows-x64`，接著
 `cmake --build build_x64 --config RelWithDebInfo`。
+
+VST 是 Steinberg Media Technologies GmbH 的註冊商標。

@@ -32,7 +32,7 @@ target_compile_definitions(vstex-host PUBLIC NOMINMAX)
 # Scanning loads every plugin once; doing it in a child process means a crashing plugin can't take OBS down.
 add_executable(vst-ex-scanner src/scanner/scanner-main.cpp)
 target_link_libraries(vst-ex-scanner PRIVATE vstex-host)
-install(TARGETS vst-ex-scanner RUNTIME DESTINATION "${CMAKE_PROJECT_NAME}/bin/64bit")
+install(TARGETS vst-ex-scanner RUNTIME DESTINATION "vst-enigmax-loader/bin/64bit")
 add_custom_command(
   TARGET vst-ex-scanner
   POST_BUILD
@@ -46,13 +46,48 @@ add_executable(pitch-shifter-test EXCLUDE_FROM_ALL src/dsp/pitch-shifter-test.cp
 target_include_directories(pitch-shifter-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_executable(beat-align-test EXCLUDE_FROM_ALL src/dsp/beat-align-test.cpp)
 target_include_directories(beat-align-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-add_library(${CMAKE_PROJECT_NAME} MODULE)
-add_dependencies(${CMAKE_PROJECT_NAME} vst-ex-scanner)
+add_executable(juce-format-test EXCLUDE_FROM_ALL src/loader/juce-format-test.cpp)
+target_include_directories(juce-format-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 find_package(libobs REQUIRED)
 find_package(obs-frontend-api REQUIRED)
 find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
+
+# VST Enigmax Loader: VST2/VST3 hosting as its own OBS module, so VST Ex can be left out (or removed)
+# without the VST filters, and the loader works on its own in OBS's standard Filters window.
+add_library(vst-enigmax-loader MODULE)
+add_dependencies(vst-enigmax-loader vst-ex-scanner)
+target_compile_definitions(vst-enigmax-loader PRIVATE VST_ENIGMAX_LOADER LOADER_VERSION="${_version}")
+target_include_directories(vst-enigmax-loader PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(vst-enigmax-loader PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vstex-host)
+set_target_properties(vst-enigmax-loader PROPERTIES AUTOMOC ON PREFIX "")
+target_sources(
+  vst-enigmax-loader
+  PRIVATE
+    src/loader/loader-main.cpp
+    src/loader/loader-dialog.cpp
+    src/loader/loader-dialog.h
+    src/loader/handover.cpp
+    src/loader/handover.h
+    src/loader/juce-format.h
+    src/loader/loader-support.c
+    src/plugin-support.h
+    src/vst-filter.cpp
+    src/vst-filter.h
+    src/plugin-meta.cpp
+    src/plugin-meta.h
+    src/plugin-scanner.cpp
+    src/plugin-scanner.h
+    src/ui/editor-window.cpp
+    src/ui/editor-window.h
+    src/ui/plugin-picker.cpp
+    src/ui/plugin-picker.h
+    src/ui/ui-text.h
+)
+install(TARGETS vst-enigmax-loader LIBRARY DESTINATION "vst-enigmax-loader/bin/64bit")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/data-loader/" DESTINATION "vst-enigmax-loader/data")
+
+add_library(${CMAKE_PROJECT_NAME} MODULE)
 target_link_libraries(
   ${CMAKE_PROJECT_NAME}
   PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vstex-host winmm
@@ -63,12 +98,10 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/plugin-main.cpp
-    src/vst-filter.cpp
+    src/loader-api.h
     src/vst-filter.h
     src/plugin-meta.cpp
     src/plugin-meta.h
-    src/plugin-scanner.cpp
-    src/plugin-scanner.h
     src/pitch-filter.cpp
     src/pitch-filter.h
     src/stereo-filter.cpp
@@ -77,10 +110,10 @@ target_sources(
     src/dsp/pitch-shifter.h
     src/switch-sets.cpp
     src/switch-sets.h
+    src/ui/backup.cpp
+    src/ui/backup.h
     src/ui/chain-view.cpp
     src/ui/chain-view.h
-    src/ui/editor-window.cpp
-    src/ui/editor-window.h
     src/ui/ex-filters-dialog.cpp
     src/ui/ex-filters-dialog.h
     src/ui/filter-history.cpp
@@ -89,8 +122,6 @@ target_sources(
     src/ui/fx-dock.cpp
     src/ui/fx-dock.h
     src/ui/menu-hook.h
-    src/ui/plugin-picker.cpp
-    src/ui/plugin-picker.h
     src/ui/properties-panel.cpp
     src/ui/properties-panel.h
     src/ui/switch-dock.cpp

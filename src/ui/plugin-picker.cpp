@@ -79,31 +79,41 @@ QString columnId(int col)
 }
 
 constexpr int kDetailRowsPerScreen = 9;
-enum Role { RoleVendor = Qt::UserRole + 1, RoleNotes, RoleLine3 };
+enum Role { RoleVendor = Qt::UserRole + 1, RoleNotes, RoleLine3, RoleFavorites };
 
-// "★1 3" badge in the top-left corner of a thumbnail; nothing when the plugin is in no favorite.
-QPixmap withFavoriteBadge(QPixmap pm, quint8 bits)
+// "★1 3" badge drawn at `topLeft`; nothing when the plugin is in no favorite. Same size in every view:
+// the details view shrinks its pictures, so it draws the badge itself instead of baking it into the picture.
+void drawFavoriteBadge(QPainter &p, QPoint topLeft, quint8 bits)
 {
 	if (!bits)
-		return pm;
+		return;
 	QStringList nums;
 	for (int i = 0; i < PluginMeta::kFavorites; i++)
 		if (bits & (1u << i))
 			nums << QString::number(i + 1);
 	QString text = QStringLiteral("★") + nums.join(' ');
-	QPainter p(&pm);
+	p.save();
 	QFont f = p.font();
 	f.setBold(true);
-	f.setPixelSize(qMax(12, pm.height() / 9));
+	f.setPixelSize(qMax(12, kGridThumb.height() / 9));
 	p.setFont(f);
 	QRect box = p.fontMetrics().boundingRect(text).adjusted(-5, -2, 5, 2);
-	box.moveTopLeft(QPoint(4, 4));
+	box.moveTopLeft(topLeft);
 	p.setRenderHint(QPainter::Antialiasing);
 	p.setPen(Qt::NoPen);
 	p.setBrush(QColor(0, 0, 0, 170));
 	p.drawRoundedRect(box, 4, 4);
 	p.setPen(QColor(255, 200, 40));
 	p.drawText(box, Qt::AlignCenter, text);
+	p.restore();
+}
+
+QPixmap withFavoriteBadge(QPixmap pm, quint8 bits)
+{
+	if (bits) {
+		QPainter p(&pm);
+		drawFavoriteBadge(p, QPoint(4, 4), bits);
+	}
 	return pm;
 }
 
@@ -136,6 +146,7 @@ public:
 			p->setRenderHint(QPainter::SmoothPixmapTransform);
 			p->drawPixmap(target, pm);
 		}
+		drawFavoriteBadge(*p, pic.topLeft() + QPoint(4, 4), quint8(index.data(RoleFavorites).toUInt()));
 
 		QVariant fgData = index.data(Qt::ForegroundRole);
 		QColor fg = selected ? opt.palette.highlightedText().color()
@@ -272,7 +283,8 @@ PluginPicker::PluginPicker(QWidget *parent, bool multi) : QDialog(parent), sortC
 	QHeaderView *header = table->horizontalHeader();
 	header->setSectionResizeMode(QHeaderView::Interactive);
 	header->setSectionsMovable(true);
-	header->setStretchLastSection(true);
+	// No stretching: a stretched last column (the file path) is squeezed into the view instead of scrolling.
+	header->setStretchLastSection(false);
 	header->setSortIndicatorShown(true);
 	header->setSectionsClickable(true);
 	table->viewport()->installEventFilter(this);
@@ -519,6 +531,8 @@ void PluginPicker::applyHiddenMode()
 {
 	bool on = hiddenButton->isChecked();
 	table->setColumnHidden(ColPath, on);
+	if (!on)
+		table->resizeColumnToContents(ColPath); // full paths, reachable with the horizontal scrollbar
 	foldersButton->setVisible(!on); // shows folder paths; keep it out of reach while hidden
 	hidTab->setVisible(!on);
 	if (on && favoriteGroup->checkedId() == TabHidden)
@@ -654,10 +668,11 @@ void PluginPicker::rebuildFavoriteButtons()
 		}
 	}
 	for (int i = 0; i < count; i++) {
-		auto *b = new QPushButton(favoriteLabel(i), this);
+		// Long names are cut so 8 favorites never push the window wider than the screen.
+		auto *b = new QPushButton(fontMetrics().elidedText(favoriteLabel(i), Qt::ElideRight, 140), this);
 		b->setCheckable(true);
 		b->setContextMenuPolicy(Qt::CustomContextMenu);
-		b->setToolTip(T("Browser.Favorite.Tip"));
+		b->setToolTip(favoriteLabel(i) + '\n' + T("Browser.Favorite.Tip"));
 		connect(b, &QPushButton::customContextMenuRequested, this,
 			[this, b, i](const QPoint &pos) { showFavoriteButtonMenu(i, b->mapToGlobal(pos)); });
 		favoriteGroup->addButton(b, i);
@@ -690,7 +705,6 @@ void PluginPicker::refresh()
 	int tab = favoriteGroup->checkedId();
 	bool hideHidden = hiddenButton->isChecked();
 	QStringList recent = meta.recent();
-	int hiddenCount = 0;
 
 	struct Row {
 		int index;
@@ -704,8 +718,6 @@ void PluginPicker::refresh()
 		const auto &d = plugins[i];
 		QString key = PluginMeta::keyOf(d);
 		PluginMeta::Entry e = meta.get(key);
-		if (e.hidden)
-			hiddenCount++;
 		if (e.hidden && hideHidden)
 			continue;
 		if ((tab >= 0 && !(e.favorites & (1u << tab))) || (tab == TabUsed && !recent.contains(key)) ||
@@ -769,7 +781,9 @@ void PluginPicker::refresh()
 			int n = grid->count();
 			initials.insert(letterOf(r.cells[ColName]));
 			QSize size = view == ViewDetail ? kDetailThumb : kGridThumb;
-			QPixmap pic = withFavoriteBadge(thumbnail(r.index, size), r.favorites);
+			QPixmap pic = thumbnail(r.index, size);
+			if (view != ViewDetail) // the details delegate draws the badge at full size
+				pic = withFavoriteBadge(pic, r.favorites);
 			auto *item = new QListWidgetItem(QIcon(pic), r.cells[ColName], grid);
 			item->setData(Qt::UserRole, r.index);
 			if (view == ViewDetail) {
@@ -779,6 +793,7 @@ void PluginPicker::refresh()
 				item->setData(RoleVendor, r.cells[ColVendor]);
 				item->setData(RoleNotes, r.cells[ColMemo]);
 				item->setData(RoleLine3, line3);
+				item->setData(RoleFavorites, uint(r.favorites));
 			}
 			item->setToolTip(tip);
 			if (view == ViewDetail)
@@ -829,7 +844,8 @@ void PluginPicker::refresh()
 	if (!columnsSized && table->rowCount() > 0) {
 		for (int c = 0; c < ColFav0; c++) {
 			table->resizeColumnToContents(c);
-			table->setColumnWidth(c, qMin(table->columnWidth(c), kMaxInitialColumnWidth));
+			if (c != ColPath) // paths stay whole; the horizontal scrollbar reaches them
+				table->setColumnWidth(c, qMin(table->columnWidth(c), kMaxInitialColumnWidth));
 		}
 		columnsSized = true;
 	}
@@ -840,7 +856,7 @@ void PluginPicker::refresh()
 	active->horizontalScrollBar()->setValue(scrollX);
 	active->verticalScrollBar()->setValue(scrollY);
 
-	hiddenButton->setText(T("Browser.Hidden").arg(hiddenCount));
+	hiddenButton->setText(T("Browser.Hidden")); // no count: how many plugins are hidden is itself private
 	usedTab->setText(T("Browser.Used") + QString(" (%1)").arg(recent.size()));
 	okButton->setEnabled(currentIndex() >= 0);
 	if (PluginCatalog::instance().isScanning() || thumbRunning)

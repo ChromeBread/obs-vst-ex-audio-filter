@@ -4,11 +4,10 @@
 #include "plugin-meta.h"
 #include "switch-sets.h"
 #include "ui/filter-history.h"
-#include "ui/plugin-picker.h"
 #include "ui/properties-panel.h"
 #include "ui/sync-dialog.h"
 #include "ui/ui-text.h"
-#include "vst-filter.h"
+#include "loader-api.h"
 
 #include <obs-frontend-api.h>
 
@@ -114,7 +113,7 @@ QString typeLabel(obs_source_t *filter)
 int filterLatencySamples(obs_source_t *filter)
 {
 	if (strcmp(obs_source_get_unversioned_id(filter), VST_EX_FILTER_ID) == 0)
-		return vst_ex_latency_samples(filter);
+		return loader_latency_samples(filter);
 	return vst_ex_pitch_latency_samples(filter);
 }
 
@@ -478,6 +477,10 @@ void ExFiltersDialog::showAddMenu()
 	bold.setBold(true);
 	vst->setFont(bold);
 	connect(vst, &QAction::triggered, this, &ExFiltersDialog::addVstFilter);
+	if (!loader_installed()) { // VST hosting is the separate VST Enigmax Loader module
+		vst->setText(T("AddVst.NoLoader"));
+		vst->setEnabled(false);
+	}
 	menu.addSeparator();
 
 	struct Type {
@@ -519,16 +522,10 @@ void ExFiltersDialog::addFilter(const char *type, const QString &baseName, obs_d
 
 void ExFiltersDialog::addVstFilter()
 {
-	QVector<vstex::PluginDescription> list;
-	if (!PluginPicker::pickMany(this, list))
-		return;
-	for (const auto &chosen : list) {
-		OBSDataAutoRelease settings = obs_data_create();
-		obs_data_set_string(settings, S_PLUGIN_PATH, chosen.path.c_str());
-		obs_data_set_string(settings, S_PLUGIN_UID, chosen.uid.c_str());
-		obs_data_set_string(settings, S_PLUGIN_NAME, chosen.name.c_str());
-		obs_data_set_string(settings, S_PLUGIN_FORMAT, vstex::formatName(chosen.format));
-		addFilter(VST_EX_FILTER_ID, QString::fromStdString(chosen.name), settings);
+	OBSDataArrayAutoRelease list = loader_pick(this);
+	for (size_t i = 0; i < obs_data_array_count(list); i++) {
+		OBSDataAutoRelease settings = obs_data_array_item(list, i);
+		addFilter(VST_EX_FILTER_ID, QString::fromUtf8(obs_data_get_string(settings, S_PLUGIN_NAME)), settings);
 	}
 }
 
@@ -571,7 +568,7 @@ void ExFiltersDialog::duplicateSelected()
 void ExFiltersDialog::openFilterUi(OBSSource filter)
 {
 	if (strcmp(obs_source_get_unversioned_id(filter), VST_EX_FILTER_ID) == 0) {
-		vst_ex_open_editor(filter);
+		loader_call_filter(filter, LOADER_PROC_OPEN_EDITOR);
 		return;
 	}
 	obs_properties_t *p = obs_source_properties(filter);
@@ -805,8 +802,9 @@ void ExFiltersDialog::showPresetMenu()
 		}
 		QString name = root["name"].toString(QFileInfo(path).completeBaseName());
 		QJsonObject all = loadPresets();
-		while (all.contains(name))
-			name += " (2)";
+		QString base = name;
+		for (int n = 2; all.contains(name); n++)
+			name = QString("%1 (%2)").arg(base).arg(n);
 		all.insert(name, root["chain"].toString());
 		savePresets(all);
 	});

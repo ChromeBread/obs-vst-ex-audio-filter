@@ -13,6 +13,7 @@
 
 #include <QApplication>
 #include <QByteArray>
+#include <QFileInfo>
 #include <QMainWindow>
 #include <QPointer>
 #include <QThread>
@@ -25,7 +26,6 @@
 
 namespace {
 
-std::function<void(obs_source_t *)> editedCallback;
 std::atomic<uint64_t> processNs{0}; // time spent inside plugins' process(), all filters
 
 struct VstFilter {
@@ -44,6 +44,14 @@ struct VstFilter {
 	double sampleRate = 48000.0;
 	int channels = 2;
 };
+
+void emit_edited(obs_source_t *source)
+{
+	calldata_t cd = {};
+	calldata_set_ptr(&cd, "source", source);
+	signal_handler_signal(obs_get_signal_handler(), "vst_enigmax_edited", &cd);
+	calldata_free(&cd);
+}
 
 bool onUiThread()
 {
@@ -101,10 +109,7 @@ void loadPlugin(VstFilter *f, const std::string &path, const std::string &uid, c
 		obs_source_t *source = f->source;
 		next->onEdited = [source] {
 			// VST2 automation can arrive on the audio thread; hop to the UI thread.
-			QMetaObject::invokeMethod(qApp, [source] {
-				if (editedCallback)
-					editedCallback(source);
-			});
+			QMetaObject::invokeMethod(qApp, [source] { emit_edited(source); });
 		};
 	}
 
@@ -145,6 +150,28 @@ void filter_update(void *data, obs_data_t *settings)
 	});
 }
 
+// This filter's own screenshot first; the plugin's thumbnail until one is taken.
+void filter_pictures(obs_source_t *source, QString &thumb, QString &full)
+{
+	auto &meta = PluginMeta::instance();
+	QString uuid = QString::fromUtf8(obs_source_get_uuid(source));
+	thumb = meta.filterShotPath(uuid, false);
+	if (QFileInfo::exists(thumb)) {
+		full = meta.filterShotPath(uuid, true);
+		if (!QFileInfo::exists(full))
+			full = thumb;
+		return;
+	}
+	OBSDataAutoRelease settings = obs_source_get_settings(source);
+	vstex::PluginDescription d;
+	d.format = strcmp(obs_data_get_string(settings, S_PLUGIN_FORMAT), "VST2") == 0 ? vstex::PluginFormat::VST2
+										      : vstex::PluginFormat::VST3;
+	d.uid = obs_data_get_string(settings, S_PLUGIN_UID);
+	d.name = obs_data_get_string(settings, S_PLUGIN_NAME);
+	thumb = meta.thumbnailPath(d);
+	full = meta.fullImagePath(d);
+}
+
 void *filter_create(obs_data_t *settings, obs_source_t *source)
 {
 	auto *f = new VstFilter();
@@ -153,6 +180,21 @@ void *filter_create(obs_data_t *settings, obs_source_t *source)
 	f->sampleRate = (double)audio_output_get_sample_rate(audio);
 	f->channels = (int)audio_output_get_channels(audio);
 	filter_update(f, settings);
+
+	// Calls from VST Ex (a separate module), see vst-filter.h.
+	proc_handler_t *ph = obs_source_get_proc_handler(source);
+	proc_handler_add(ph, LOADER_PROC_OPEN_EDITOR, [](void *d, calldata_t *) { vst_ex_open_editor(static_cast<VstFilter *>(d)->source); }, f);
+	proc_handler_add(ph, LOADER_PROC_SCREENSHOT, [](void *d, calldata_t *) { vst_ex_capture_screenshot(static_cast<VstFilter *>(d)->source); }, f);
+	proc_handler_add(ph, LOADER_PROC_LATENCY, [](void *d, calldata_t *cd) {
+		calldata_set_int(cd, "samples", vst_ex_latency_samples(static_cast<VstFilter *>(d)->source));
+	}, f);
+	proc_handler_add(ph, LOADER_PROC_PICTURES, [](void *d, calldata_t *cd) {
+		obs_source_t *source = static_cast<VstFilter *>(d)->source;
+		QString thumb, full;
+		filter_pictures(source, thumb, full);
+		calldata_set_string(cd, "thumb", thumb.toUtf8().constData());
+		calldata_set_string(cd, "full", full.toUtf8().constData());
+	}, f);
 	return f;
 }
 
@@ -254,11 +296,6 @@ obs_properties_t *filter_properties(void *data)
 
 } // namespace
 
-void vst_ex_set_edited_callback(std::function<void(obs_source_t *)> cb)
-{
-	editedCallback = std::move(cb);
-}
-
 void vst_ex_open_editor(obs_source_t *filter)
 {
 	if (!filter || strcmp(obs_source_get_unversioned_id(filter), VST_EX_FILTER_ID) != 0)
@@ -287,8 +324,7 @@ void vst_ex_open_editor(obs_source_t *filter)
 		OBSDataAutoRelease settings = obs_source_get_settings(source);
 		obs_data_set_string(settings, S_PLUGIN_STATE, encodeState(state).c_str());
 		obs_source_update(source, settings); // filter_update pushes the new state into the plugin
-		if (editedCallback)
-			editedCallback(source);
+		emit_edited(source);
 	};
 	if (!editor->openEditor()) {
 		delete editor;

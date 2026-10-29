@@ -18,51 +18,211 @@
 #include <QWheelEvent>
 #include <QPainter>
 #include <QPushButton>
+#include <QSignalBlocker>
+#include <QSlider>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <cstring>
+#include <string>
+#include <thread>
 
 #include <windows.h>
+#include <mmdeviceapi.h>
 #include <mmsystem.h>
+#include <propsys.h>
+
+#ifndef DRV_QUERYFUNCTIONINSTANCEID // from mmddk.h, which the SDK does not always ship
+#define DRV_QUERYFUNCTIONINSTANCEID (DRV_RESERVED + 17)
+#define DRV_QUERYFUNCTIONINSTANCEIDSIZE (DRV_RESERVED + 18)
+#endif
 
 namespace {
 
 constexpr int kBpm = 120;
 constexpr int kBeatMs = 60000 / kBpm;
-constexpr int kLoopBeats = 8;      // 4 to listen, 4 to clap
-constexpr int kLoops = 2;          // the second loop doubles the claps (and shows off)
-constexpr int kSongBeats = kLoopBeats * kLoops;
-constexpr int kCaptureMs = kSongBeats * kBeatMs + 1200; // song + margin for late claps
+constexpr int kLoopBeats = 8;      // the test song: 2 loops of 8 beats, clapped all the way
+constexpr int kLoops = 2;
+constexpr int kCountInBeats = 4;   // "tan tan tan (rest)" before the song
+constexpr int kBarBeats = 4;
+constexpr int kTotalBeats = kCountInBeats + kLoopBeats * kLoops;
+constexpr int kCaptureMs = kTotalBeats * kBeatMs + 1200; // count-in + song + margin for late claps
 constexpr int kVisibleMs = 3000;   // width of the scrolling view
 constexpr int kStartLeadMs = 300;  // record a little before the song starts
 constexpr int kSampleRate = 48000; // of the generated test song
+constexpr int kSongMuteDb = -61;    // song volume at or below this is silent
+constexpr int kSongSliderMaxDb = 0; // the slider stops here; typing goes up to kSongMaxDb
+constexpr int kSongMaxDb = 12;
 
-// 16-bit mono WAV of the generated test song (see dsp/test-song.h).
-QByteArray makeTestSong()
+float dbToGain(int db)
 {
-	std::vector<float> mix = vstex::makeTestSong(kSampleRate, kBeatMs, kLoopBeats, kLoops);
-	const int total = int(mix.size());
-	// 16-bit mono WAV
-	QByteArray wav;
-	auto put32 = [&](uint32_t v) { wav.append(reinterpret_cast<const char *>(&v), 4); };
-	auto put16 = [&](uint16_t v) { wav.append(reinterpret_cast<const char *>(&v), 2); };
-	wav.append("RIFF");
-	put32(36 + total * 2);
-	wav.append("WAVEfmt ");
-	put32(16);
-	put16(1);
-	put16(1);
-	put32(kSampleRate);
-	put32(kSampleRate * 2);
-	put16(2);
-	put16(16);
-	wav.append("data");
-	put32(total * 2);
-	for (float s : mix)
-		put16(uint16_t(int16_t(std::lround(std::clamp(s, -1.0f, 1.0f) * 32000))));
-	return wav;
+	return db <= kSongMuteDb ? 0.0f : float(std::pow(10.0, db / 20.0));
+}
+
+// Count-in (three wood clicks and a rest), then the test song (see dsp/test-song.h).
+std::vector<float> makeSongWithCountIn()
+{
+	const int beatSamples = kSampleRate * kBeatMs / 1000;
+	std::vector<float> mix(size_t(beatSamples) * kCountInBeats, 0.0f);
+	for (int beat = 0; beat < kCountInBeats - 1; beat++)
+		for (int i = 0; i < kSampleRate / 15; i++) {
+			double t = double(i) / kSampleRate;
+			mix[size_t(beat) * beatSamples + i] = float(0.7 * std::exp(-t * 60.0) * std::sin(2 * 3.14159265358979 * 1600.0 * t));
+		}
+	std::vector<float> song = vstex::makeTestSong(kSampleRate, kBeatMs, kLoopBeats, kLoops);
+	mix.insert(mix.end(), song.begin(), song.end());
+	return mix;
+}
+
+} // namespace
+
+// Streams the song to one output through waveOut, four 20 ms buffers ahead, applying the volume as it goes,
+// so the slider works while it plays (PlaySound took the volume once, at the start, and only the default output).
+class SongPlayer {
+public:
+	~SongPlayer() { stop(); }
+
+	void setGain(float g) { gain = g; }
+
+	bool start(UINT device, std::vector<float> samples)
+	{
+		stop();
+		song = std::move(samples);
+		pos = 0;
+		WAVEFORMATEX fmt = {};
+		fmt.wFormatTag = WAVE_FORMAT_PCM;
+		fmt.nChannels = 1;
+		fmt.nSamplesPerSec = kSampleRate;
+		fmt.wBitsPerSample = 16;
+		fmt.nBlockAlign = 2;
+		fmt.nAvgBytesPerSec = kSampleRate * 2;
+		event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+		if (waveOutOpen(&out, device, &fmt, (DWORD_PTR)event, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR) {
+			CloseHandle(event);
+			event = nullptr;
+			out = nullptr;
+			return false;
+		}
+		stopping = false;
+		worker = std::thread([this] { run(); });
+		return true;
+	}
+
+	void stop()
+	{
+		if (!out)
+			return;
+		stopping = true;
+		SetEvent(event);
+		worker.join();
+		waveOutReset(out);
+		for (Buffer &b : buffers)
+			if (b.header.dwFlags & WHDR_PREPARED)
+				waveOutUnprepareHeader(out, &b.header, sizeof(WAVEHDR));
+		waveOutClose(out);
+		out = nullptr;
+		CloseHandle(event);
+		event = nullptr;
+	}
+
+private:
+	static constexpr size_t kFrames = kSampleRate / 50;
+	struct Buffer {
+		WAVEHDR header = {};
+		std::array<int16_t, kFrames> data = {};
+	};
+
+	void run()
+	{
+		for (Buffer &b : buffers)
+			b.header = {};
+		while (!stopping) {
+			bool playing = false;
+			for (Buffer &b : buffers) {
+				if ((b.header.dwFlags & WHDR_PREPARED) && !(b.header.dwFlags & WHDR_DONE)) {
+					playing = true;
+					continue;
+				}
+				if (b.header.dwFlags & WHDR_PREPARED)
+					waveOutUnprepareHeader(out, &b.header, sizeof(WAVEHDR));
+				b.header = {};
+				if (pos >= song.size())
+					continue;
+				size_t n = std::min(kFrames, song.size() - pos);
+				float g = gain;
+				for (size_t i = 0; i < n; i++)
+					b.data[i] = int16_t(std::lround(std::clamp(song[pos + i] * g, -1.0f, 1.0f) * 32000));
+				pos += n;
+				b.header.lpData = reinterpret_cast<LPSTR>(b.data.data());
+				b.header.dwBufferLength = DWORD(n * sizeof(int16_t));
+				waveOutPrepareHeader(out, &b.header, sizeof(WAVEHDR));
+				waveOutWrite(out, &b.header, sizeof(WAVEHDR));
+				playing = true;
+			}
+			if (!playing)
+				break; // all of it played
+			WaitForSingleObject(event, 100);
+		}
+	}
+
+	HWAVEOUT out = nullptr;
+	HANDLE event = nullptr;
+	std::thread worker;
+	std::atomic<bool> stopping{false};
+	std::atomic<float> gain{1.0f};
+	std::array<Buffer, 4> buffers;
+	std::vector<float> song;
+	size_t pos = 0;
+};
+
+namespace {
+
+struct OutputDevice {
+	UINT id;
+	QString name, endpoint; // endpoint: Windows' device id, kept to find the same device next time
+};
+
+// waveOut devices with their full names (waveOut itself cuts names at 31 characters).
+QVector<OutputDevice> outputDevices()
+{
+	static const PROPERTYKEY kFriendlyName = {{0xa45c254e, 0xdf1c, 0x4efd, {0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0}}, 14};
+	QVector<OutputDevice> list;
+	IMMDeviceEnumerator *devices = nullptr;
+	CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&devices));
+	for (UINT i = 0; i < waveOutGetNumDevs(); i++) {
+		WAVEOUTCAPSW caps = {};
+		waveOutGetDevCapsW(i, &caps, sizeof(caps));
+		OutputDevice d{i, QString::fromWCharArray(caps.szPname), QString()};
+		auto handle = reinterpret_cast<HWAVEOUT>(UINT_PTR(i));
+		ULONG size = 0;
+		if (waveOutMessage(handle, DRV_QUERYFUNCTIONINSTANCEIDSIZE, DWORD_PTR(&size), 0) == MMSYSERR_NOERROR && size) {
+			std::wstring id(size / sizeof(wchar_t), L'\0');
+			if (waveOutMessage(handle, DRV_QUERYFUNCTIONINSTANCEID, DWORD_PTR(id.data()), size) == MMSYSERR_NOERROR) {
+				d.endpoint = QString::fromWCharArray(id.c_str());
+				IMMDevice *dev = nullptr;
+				IPropertyStore *props = nullptr;
+				if (devices && SUCCEEDED(devices->GetDevice(id.c_str(), &dev)) &&
+				    SUCCEEDED(dev->OpenPropertyStore(STGM_READ, &props))) {
+					PROPVARIANT v;
+					PropVariantInit(&v);
+					if (SUCCEEDED(props->GetValue(kFriendlyName, &v)) && v.vt == VT_LPWSTR)
+						d.name = QString::fromWCharArray(v.pwszVal);
+					PropVariantClear(&v);
+				}
+				if (props)
+					props->Release();
+				if (dev)
+					dev->Release();
+			}
+		}
+		list << d;
+	}
+	if (devices)
+		devices->Release();
+	return list;
 }
 
 bool hasAudio(obs_source_t *source)
@@ -215,25 +375,17 @@ private:
 	double viewStart = 0, viewSpan = kVisibleMs, dragX = 0, dragStart = 0;
 };
 
-// 8 boxes, one per beat: 1-4 "listen", 5-8 "clap". A box lights when its kick is *heard* in the reference,
-// never on a timer, so it can't lead the sound and pull the claps off the music.
+// VirtualDJ-style beat counter: four blocks for the beats of the current bar (the first one accented), and a
+// row below for where the bar is: count-in, then the song's bars. Driven by what the reference actually played
+// (from the first click it heard), never by a timer of its own, so it cannot run ahead of the sound.
 class BeatBar : public QWidget {
 public:
-	explicit BeatBar(QWidget *parent) : QWidget(parent) { setMinimumHeight(86); }
+	explicit BeatBar(QWidget *parent) : QWidget(parent) { setMinimumHeight(96); }
 
-	void setClapMode(bool on)
+	// beat: 0-based beat heard so far (count-in included), -1 before the first click.
+	void set(int beat)
 	{
-		clapMode = on;
-		update();
-	}
-
-	void set(int heard, int claps, bool running)
-	{
-		loop = heard > 0 ? qMin((heard - 1) / kLoopBeats, kLoops - 1) : 0;
-		heard -= loop * kLoopBeats; // boxes show the current loop
-		this->heard = heard;
-		this->claps = claps;
-		this->running = running;
+		this->beat = beat;
 		update();
 	}
 
@@ -242,50 +394,38 @@ protected:
 	{
 		QPainter p(this);
 		p.setRenderHint(QPainter::Antialiasing);
-		int gap = 6, cellW = (width() - gap * (kLoopBeats + 1)) / kLoopBeats, cellH = height() - 30;
+		const int gap = 6, rowH = 16, cellH = height() - rowH - gap;
+		const int cellW = (width() - gap * (kBarBeats + 1)) / kBarBeats;
+		const bool countIn = beat < kCountInBeats;
+		const int bar = beat < 0 ? -1 : beat / kBarBeats, inBar = beat < 0 ? -1 : beat % kBarBeats;
 		QFont big = font();
 		big.setPixelSize(cellH / 2);
 		big.setBold(true);
-		for (int i = 0; i < kLoopBeats; i++) {
-			bool clapBeat = clapMode && i >= kLoopBeats / 2;
-			bool lit = i < heard;
-			bool current = i == heard - 1;
+		p.setFont(big);
+		for (int i = 0; i < kBarBeats; i++) {
 			QRect cell(gap + i * (cellW + gap), 0, cellW, cellH);
-			QColor base = !clapMode ? QColor(90, 200, 120) : clapBeat ? QColor(255, 140, 40) : QColor(80, 160, 255);
+			bool rest = countIn && i == kBarBeats - 1; // "tan tan tan (rest)"
+			QColor on = countIn ? QColor(90, 160, 255) : i == 0 ? QColor(255, 90, 60) : QColor(240, 240, 245);
 			p.setPen(Qt::NoPen);
-			p.setBrush(lit ? (current ? base.lighter(130) : base.darker(160)) : QColor(50, 50, 58));
+			p.setBrush(i == inBar ? (rest ? on.darker(200) : on) : i < inBar ? on.darker(300) : QColor(50, 50, 58));
 			p.drawRoundedRect(cell, 6, 6);
-			p.setPen(lit ? Qt::white : QColor(140, 140, 150));
-			p.setFont(big);
-			p.drawText(cell, Qt::AlignCenter, QString::number(i + 1));
+			p.setPen(i == inBar && !countIn && i != 0 ? QColor(30, 30, 36) : QColor(200, 200, 210));
+			p.drawText(cell, Qt::AlignCenter, rest ? QStringLiteral("-") : QString::number(i + 1));
 		}
-		// The word under each half: what to do in it.
-		QFont labelFont = font();
-		labelFont.setBold(true);
-		p.setFont(labelFont);
-		QString loopText = QString("   [%1/%2]").arg(loop + 1).arg(kLoops);
-		if (!clapMode) { // earphone on the mic: one label, and how many kicks the mic heard
-			p.setPen(QColor(130, 220, 150));
-			QString text = T("Sync.Kicks") + loopText;
-			if (running)
-				text += "   " + T("Sync.MicHeard").arg(claps);
-			p.drawText(QRect(0, cellH, width(), 30), Qt::AlignCenter, text);
-			return;
+		// Bar position: count-in, then each bar of the song.
+		const int bars = kTotalBeats / kBarBeats;
+		const int segW = (width() - gap * (bars + 1)) / bars;
+		for (int b = 0; b < bars; b++) {
+			QRect seg(gap + b * (segW + gap), height() - rowH, segW, rowH);
+			QColor on = b == 0 ? QColor(90, 160, 255) : QColor(255, 170, 60);
+			p.setPen(Qt::NoPen);
+			p.setBrush(b == bar ? on : b < bar ? on.darker(250) : QColor(50, 50, 58));
+			p.drawRoundedRect(seg, 3, 3);
 		}
-		int half = (width() - gap) / 2;
-		p.setPen(QColor(120, 180, 255));
-		p.drawText(QRect(0, cellH, half, 30), Qt::AlignCenter,
-			   T("Sync.Listen") + loopText);
-		p.setPen(QColor(255, 160, 70));
-		QString clapText = T("Sync.Clap");
-		if (running && heard >= kLoopBeats / 2)
-			clapText += QString("  (%1)").arg(claps);
-		p.drawText(QRect(half, cellH, half, 30), Qt::AlignCenter, clapText);
 	}
 
 private:
-	int heard = 0, claps = 0, loop = 0;
-	bool running = false, clapMode = true;
+	int beat = -1;
 };
 
 void SyncDialog::run(QWidget *parent, obs_source_t *target)
@@ -326,15 +466,49 @@ SyncDialog::SyncDialog(QWidget *parent, obs_source_t *target) : QDialog(parent)
 	earphoneMode->setChecked(PluginMeta::instance().uiValue("syncEarphone").toBool(false));
 	playSong = new QCheckBox(T("Sync.PlaySong"), this);
 	playSong->setChecked(true);
+	player = std::make_unique<SongPlayer>();
+	deviceBox = new QComboBox(this);
+	deviceBox->setToolTip(T("Sync.Device.Tip"));
+	deviceBox->addItem(T("Sync.Device.Default"), QString());
+	deviceBox->setItemData(0, uint(WAVE_MAPPER), Qt::UserRole + 1);
+	QString savedDevice = PluginMeta::instance().uiValue("syncSongDevice").toString();
+	for (const OutputDevice &d : outputDevices()) {
+		deviceBox->addItem(d.name, d.endpoint);
+		deviceBox->setItemData(deviceBox->count() - 1, d.id, Qt::UserRole + 1);
+		if (!savedDevice.isEmpty() && d.endpoint == savedDevice)
+			deviceBox->setCurrentIndex(deviceBox->count() - 1);
+	}
+	connect(deviceBox, &QComboBox::activated, this, [this] {
+		PluginMeta::instance().setUiValue("syncSongDevice", deviceBox->currentData().toString());
+	});
+	// Song volume: the slider covers -60..0 dB (its left end is silent), the box also takes up to +12 dB.
+	songSlider = new QSlider(Qt::Horizontal, this);
+	songSlider->setRange(kSongMuteDb, kSongSliderMaxDb);
+	songDb = new QSpinBox(this);
+	songDb->setRange(kSongMuteDb, kSongMaxDb);
+	songDb->setSuffix(" dB");
+	songDb->setSpecialValueText(T("Sync.SongMute"));
+	songDb->setToolTip(T("Sync.SongVolume.Tip"));
+	songSlider->setToolTip(T("Sync.SongVolume.Tip"));
+	connect(songSlider, &QSlider::valueChanged, songDb, &QSpinBox::setValue);
+	connect(songDb, &QSpinBox::valueChanged, this, [this](int db) {
+		QSignalBlocker block(songSlider); // a typed +dB value parks the slider at 0 without lowering the box
+		songSlider->setValue(db);
+		player->setGain(dbToGain(db)); // also while the song plays
+		PluginMeta::instance().setUiValue("syncSongDb", db);
+	});
+	// A boost typed last time is not brought back: a forgotten +12 dB would blast the next session.
+	songDb->setValue(qMin(PluginMeta::instance().uiValue("syncSongDb").toInt(-6), kSongSliderMaxDb));
+	songSlider->setValue(songDb->value());
+	connect(playSong, &QCheckBox::toggled, songSlider, &QWidget::setEnabled);
+	connect(playSong, &QCheckBox::toggled, songDb, &QWidget::setEnabled);
+	connect(playSong, &QCheckBox::toggled, deviceBox, &QWidget::setEnabled);
 	auto *help = new QLabel(T("Sync.Help"), this);
 	help->setWordWrap(true);
 	view = new WaveView(this);
 	beats = new BeatBar(this);
-	beats->setClapMode(!earphoneMode->isChecked());
-	connect(earphoneMode, &QCheckBox::toggled, this, [this](bool on) {
-		PluginMeta::instance().setUiValue("syncEarphone", on);
-		beats->setClapMode(!on);
-	});
+	connect(earphoneMode, &QCheckBox::toggled, this,
+		[](bool on) { PluginMeta::instance().setUiValue("syncEarphone", on); });
 	status = new QLabel(this);
 	status->setWordWrap(true);
 	startButton = new QPushButton(T("Sync.Start"), this);
@@ -359,6 +533,11 @@ SyncDialog::SyncDialog(QWidget *parent, obs_source_t *target) : QDialog(parent)
 	form->addRow(T("Sync.Reference"), referenceBox);
 	form->addRow(T("Sync.Target"), targetBox);
 	form->addRow(playSong);
+	form->addRow(T("Sync.Device"), deviceBox);
+	auto *volumeRow = new QHBoxLayout();
+	volumeRow->addWidget(songSlider, 1);
+	volumeRow->addWidget(songDb);
+	form->addRow(T("Sync.SongVolume"), volumeRow);
 	form->addRow(earphoneMode);
 	auto *row = new QHBoxLayout();
 	row->addWidget(startButton);
@@ -425,7 +604,7 @@ void SyncDialog::start()
 		return;
 	}
 	stopCapture();
-	beats->set(0, 0, true);
+	beats->set(-1);
 	env[0].clear();
 	env[1].clear();
 	pending.clear();
@@ -438,13 +617,14 @@ void SyncDialog::start()
 	obs_source_add_audio_capture_callback(ref, onAudio, this);
 	obs_source_add_audio_capture_callback(tgt, onAudio, this);
 	startButton->setEnabled(false);
-	status->setText(T("Sync.Recording"));
+	status->setText(T("Sync.GetReady"));
 	clock.start();
 	timer.start(30);
 	if (playSong->isChecked())
 		QTimer::singleShot(kStartLeadMs, this, [this] {
-			song = makeTestSong();
-			PlaySoundW(reinterpret_cast<LPCWSTR>(song.constData()), nullptr, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+			player->setGain(dbToGain(songDb->value()));
+			if (!player->start(deviceBox->currentData(Qt::UserRole + 1).toUInt(), makeSongWithCountIn()))
+				status->setText(T("Sync.DeviceFailed"));
 		});
 }
 
@@ -456,7 +636,7 @@ void SyncDialog::stopCapture()
 			obs_source_remove_audio_capture_callback(capturing[lane], onAudio, this);
 			capturing[lane] = nullptr;
 		}
-	PlaySoundW(nullptr, nullptr, 0);
+	player->stop();
 }
 
 // Moves captured audio into 1 ms peak envelopes, placed by timestamp so both lanes share one time axis.
@@ -482,32 +662,14 @@ void SyncDialog::tick()
 	}
 	view->set(env, int(clock.elapsed()), true, nullptr);
 
-	// Live cue from what the reference actually played: kicks heard so far, claps since beat 4.
-	std::vector<int> heardKicks = vstex::findOnsets(env[0]);
-	int heard = qMin(int(heardKicks.size()), kSongBeats);
-	int loop = heard > 0 ? qMin((heard - 1) / kLoopBeats, kLoops - 1) : 0;
-	int inLoop = heard - loop * kLoopBeats;
-	int claps = 0;
-	if (earphoneMode->isChecked()) { // every kick counts: show how many the mic heard
-		claps = int(vstex::findOnsets(env[1]).size());
-		beats->set(heard, claps, true);
-		status->setText(heard == 0 ? T("Sync.GetReady") : T("Sync.Earphone.Running"));
-		if (clock.elapsed() >= kCaptureMs + kStartLeadMs)
-			finish();
-		return;
-	}
-	if (inLoop > kLoopBeats / 2) { // count claps after this loop's 4th kick
-		int from = heardKicks[loop * kLoopBeats + kLoopBeats / 2 - 1] + kBeatMs / 2;
-		for (int ms : vstex::findOnsets(env[1]))
-			claps += ms > from;
-	}
-	beats->set(heard, claps, true);
-	if (heard == 0)
+	// Live cue from what the reference actually played: the beat since the first click it heard.
+	std::vector<int> heard = vstex::findOnsets(env[0]);
+	int beat = heard.empty() ? -1 : (int(env[0].size()) - heard.front() + kBeatMs / 4) / kBeatMs;
+	beats->set(qMin(beat, kTotalBeats - 1));
+	if (beat < 0)
 		status->setText(T("Sync.GetReady"));
-	else if (inLoop <= kLoopBeats / 2) // claps start on kick 5 of the loop
-		status->setText(T("Sync.CountIn").arg(kLoopBeats / 2 + 1 - inLoop));
 	else
-		status->setText(T("Sync.ClapNow"));
+		status->setText(earphoneMode->isChecked() ? T("Sync.Earphone.Running") : T("Sync.ClapNow"));
 	if (clock.elapsed() >= kCaptureMs + kStartLeadMs)
 		finish();
 }

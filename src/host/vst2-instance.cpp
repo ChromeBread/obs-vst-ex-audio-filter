@@ -202,6 +202,32 @@ public:
 		return false;
 	}
 
+	std::vector<uint8_t> getObsVstData() override
+	{
+		if (effect->flags & effFlagsProgramChunks) {
+			void *data = nullptr;
+			intptr_t size = dispatch(effGetChunk, 1, 0, &data);
+			return data && size > 0 ? std::vector<uint8_t>((uint8_t *)data, (uint8_t *)data + size)
+						: std::vector<uint8_t>();
+		}
+		std::vector<uint8_t> state = getState(); // 'P' + floats
+		return std::vector<uint8_t>(state.begin() + 1, state.end());
+	}
+
+	void setObsVstData(const std::vector<uint8_t> &data) override
+	{
+		if (data.empty())
+			return;
+		if (effect->flags & effFlagsProgramChunks) {
+			std::vector<uint8_t> chunk(data);
+			dispatch(effSetChunk, 1, (intptr_t)chunk.size(), chunk.data());
+			return;
+		}
+		std::vector<uint8_t> state{'P'};
+		state.insert(state.end(), data.begin(), data.end());
+		setState(state);
+	}
+
 	bool hasEditor() override { return desc.hasEditor; }
 
 	bool openEditor(void *parent, int &width, int &height) override

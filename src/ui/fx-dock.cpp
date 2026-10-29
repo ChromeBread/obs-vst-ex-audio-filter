@@ -3,7 +3,7 @@
 #include "plugin-meta.h"
 #include "ui/ex-filters-dialog.h"
 #include "ui/ui-text.h"
-#include "vst-filter.h"
+#include "loader-api.h"
 
 #include <obs-frontend-api.h>
 #include <obs.hpp>
@@ -27,6 +27,7 @@ namespace {
 constexpr const char *kDockId = "vst-ex-fx-dock";
 constexpr int kPlainWidth = 100; // column width when not following the mixer (or its strip isn't found)
 constexpr int kTickMs = 500;
+constexpr int kRowTitleWidth = 110; // source name in front of a row (horizontal mixer)
 
 // "VST" filters: ours (VST Ex, Pitch / Pan, Pseudo Stereo), OBS's VST 2.x filter and atkAudio's host.
 bool isVstFilter(obs_source_t *filter)
@@ -44,10 +45,12 @@ void paintOnOff(QPushButton *b, bool on)
 			    : "QPushButton{background:#4a4a4a;color:#aaa;padding:1px;}");
 }
 
-// Where OBS draws each vertical mixer strip, by source name. Read only: nothing in the mixer is touched.
-// Class names: VolControl (OBS 31), VolumeControl (OBS 32/33). Empty if not found or the mixer is horizontal.
-QHash<QString, QRect> mixerStrips()
+// Where OBS draws each mixer strip, by source name. Read only: nothing in the mixer is touched.
+// Class names: VolControl (OBS 31), VolumeControl (OBS 32/33). Empty if not found. `horizontal` is set when the
+// Audio Mixer uses its horizontal layout (strips are rows, wider than tall).
+QHash<QString, QRect> mixerStrips(bool &horizontal)
 {
+	horizontal = false;
 	QHash<QString, QRect> out;
 	auto *main = static_cast<QWidget *>(obs_frontend_get_main_window());
 	if (!main)
@@ -56,8 +59,7 @@ QHash<QString, QRect> mixerStrips()
 		const char *cls = strip->metaObject()->className();
 		if ((strcmp(cls, "VolControl") != 0 && strcmp(cls, "VolumeControl") != 0) || !strip->isVisible())
 			continue;
-		if (strip->width() > 300)
-			return {}; // horizontal mixer: strips are full-width rows, nothing to line up under
+		horizontal = strip->width() > strip->height();
 		QRect geo(strip->mapToGlobal(QPoint(0, 0)), strip->size());
 		// The strip's objectName is the source name; the label may show a shortened one, so keep both.
 		if (!strip->objectName().isEmpty())
@@ -96,13 +98,15 @@ public:
 			perRow->addItem(T("FxDock.PerRow").arg(n), n);
 		perRow->setCurrentIndex(std::clamp(meta.uiValue("fxPerRow").toInt(2), 1, 3) - 1);
 		perRow->setToolTip(T("FxDock.PerRow.Tip"));
-		auto *bar = new QHBoxLayout();
+		barBottom = toggle(this, "FxDock.BarBottom", "FxDock.BarBottom.Tip", meta.uiValue("fxBarBottom").toBool(false));
+		bar = new QHBoxLayout();
 		bar->setSpacing(2);
 		bar->addWidget(follow);
 		bar->addWidget(reserve);
 		bar->addWidget(scrollbar);
 		bar->addWidget(perRow);
 		bar->addStretch(1);
+		bar->addWidget(barBottom);
 
 		scroll = new QScrollArea(this);
 		scroll->setWidgetResizable(false);
@@ -112,11 +116,15 @@ public:
 		empty = new QLabel(T("FxDock.Empty"), this);
 		empty->setWordWrap(true);
 		empty->setEnabled(false);
-		auto *layout = new QVBoxLayout(this);
+		layout = new QVBoxLayout(this);
 		layout->setContentsMargins(2, 2, 2, 2);
-		layout->addLayout(bar);
 		layout->addWidget(empty);
 		layout->addWidget(scroll, 1);
+		placeBar();
+		connect(barBottom, &QToolButton::toggled, this, [this](bool on) {
+			PluginMeta::instance().setUiValue("fxBarBottom", on);
+			placeBar();
+		});
 
 		auto save = [this] {
 			auto &m = PluginMeta::instance();
@@ -187,7 +195,9 @@ private:
 			},
 			&found);
 
-		QString signature;
+		bool horizontal = false;
+		QHash<QString, QRect> strips = follow->isChecked() ? mixerStrips(horizontal) : QHash<QString, QRect>();
+		QString signature = horizontal ? "H" : "V"; // rows or columns: the boxes are built differently
 		for (const auto &fx : found) {
 			signature += QString::fromUtf8(obs_source_get_uuid(fx.source)) + QString::fromUtf8(obs_source_get_name(fx.source));
 			for (const auto &f : fx.filters)
@@ -195,7 +205,7 @@ private:
 		}
 		if (signature != lastSignature) {
 			lastSignature = signature;
-			rebuild(found);
+			rebuild(found, horizontal);
 		}
 		for (const Column &col : columns)
 			for (const Button &b : col.buttons) {
@@ -203,11 +213,12 @@ private:
 				if (f)
 					paintOnOff(b.button, obs_source_enabled(f));
 			}
-		place();
+		place(strips, horizontal);
 	}
 
-	void rebuild(const std::vector<SourceFx> &found)
+	void rebuild(const std::vector<SourceFx> &found, bool horizontal)
 	{
+		rows = horizontal;
 		for (Column &col : columns)
 			delete col.box;
 		columns.clear();
@@ -217,12 +228,16 @@ private:
 			Column col;
 			col.source = QString::fromUtf8(obs_source_get_name(fx.source));
 			col.box = new QWidget(content);
-			auto *layout = new QVBoxLayout(col.box);
+			// Columns: name above the buttons. Rows (horizontal mixer): name on the left, buttons in one line.
+			QBoxLayout *layout = horizontal ? static_cast<QBoxLayout *>(new QHBoxLayout(col.box))
+							: static_cast<QBoxLayout *>(new QVBoxLayout(col.box));
 			layout->setContentsMargins(1, 0, 1, 0);
 			layout->setSpacing(2);
 			col.title = new QLabel(col.box);
 			col.title->setToolTip(col.source);
 			col.title->setEnabled(!fx.filters.empty());
+			if (horizontal)
+				col.title->setFixedWidth(kRowTitleWidth);
 			layout->addWidget(col.title);
 			auto *grid = new QGridLayout();
 			grid->setSpacing(2);
@@ -247,11 +262,14 @@ private:
 					if (!filter)
 						return;
 					if (strcmp(obs_source_get_unversioned_id(filter), VST_EX_FILTER_ID) == 0)
-						vst_ex_open_editor(filter);
+						loader_call_filter(filter, LOADER_PROC_OPEN_EDITOR);
 					else if (obs_source_t *parent = obs_filter_get_parent(filter))
 						ExFiltersDialog::open(parent);
 				});
-				grid->addWidget(b, int(i) / buttonsPerRow, int(i) % buttonsPerRow);
+				if (horizontal)
+					grid->addWidget(b, 0, int(i));
+				else
+					grid->addWidget(b, int(i) / buttonsPerRow, int(i) % buttonsPerRow);
 				col.buttons.push_back({weak, b, name});
 			}
 			anyVst |= !fx.filters.empty();
@@ -267,7 +285,22 @@ private:
 	// or leaves room for (follow ON) audio sources without VST.
 	void place()
 	{
-		QHash<QString, QRect> strips = follow->isChecked() ? mixerStrips() : QHash<QString, QRect>();
+		bool horizontal = false;
+		QHash<QString, QRect> strips = follow->isChecked() ? mixerStrips(horizontal) : QHash<QString, QRect>();
+		if (horizontal != rows) { // the mixer changed layout: rebuild first
+			lastSignature = "-";
+			tick();
+			return;
+		}
+		place(strips, horizontal);
+	}
+
+	void place(const QHash<QString, QRect> &strips, bool horizontal)
+	{
+		if (horizontal) {
+			placeRows(strips);
+			return;
+		}
 		bool keepSpace = reserve->isChecked();
 		QPoint origin = content->mapToGlobal(QPoint(0, 0));
 
@@ -311,8 +344,59 @@ private:
 		content->resize(std::max(right, scroll->viewport()->width()), bottom);
 	}
 
+	// Horizontal mixer: one row per source at the height of its mixer row, the way columns follow vertical strips.
+	void placeRows(const QHash<QString, QRect> &strips)
+	{
+		bool keepSpace = reserve->isChecked();
+		QPoint origin = content->mapToGlobal(QPoint(0, 0));
+		int width = scroll->viewport()->width();
+		std::vector<Column *> order;
+		for (Column &col : columns) {
+			bool show = !col.buttons.empty();
+			col.box->setVisible(show);
+			if (show)
+				order.push_back(&col);
+		}
+		std::stable_sort(order.begin(), order.end(), [&](Column *a, Column *b) {
+			auto ia = strips.find(a->source), ib = strips.find(b->source);
+			if ((ia == strips.end()) != (ib == strips.end()))
+				return ia != strips.end();
+			return ia != strips.end() && ia->top() < ib->top();
+		});
+		int nextFree = 0, bottom = 0;
+		if (keepSpace)
+			for (Column *col : order)
+				if (auto it = strips.find(col->source); it != strips.end())
+					nextFree = std::max(nextFree, it->bottom() - origin.y() + 1);
+		for (Column *col : order) {
+			auto it = strips.find(col->source);
+			int h = std::max(col->box->sizeHint().height(), it != strips.end() ? it->height() : 0);
+			QRect geo;
+			if (it != strips.end() && keepSpace) {
+				geo = QRect(0, std::max(0, it->top() - origin.y()), width, h); // beside its mixer row
+			} else {
+				geo = QRect(0, nextFree, width, h);
+				nextFree += h;
+			}
+			if (geo.width() != col->width)
+				fitTexts(*col, geo.width());
+			col->box->setGeometry(geo);
+			bottom = std::max(bottom, geo.bottom() + 1);
+		}
+		content->resize(width, bottom);
+	}
+
 	void fitTexts(Column &col, int width)
 	{
+		if (rows) { // name on the left, the buttons share the rest of the row
+			col.width = width;
+			QFontMetrics fm(col.title->font());
+			col.title->setText(fm.elidedText(col.source, Qt::ElideRight, kRowTitleWidth - 4));
+			int buttonW = (width - kRowTitleWidth - 8) / std::max<int>(1, (int)col.buttons.size()) - 6;
+			for (Button &b : col.buttons)
+				b.button->setText(b.button->fontMetrics().elidedText(b.name, Qt::ElideRight, std::max(10, buttonW)));
+			return;
+		}
 		col.width = width;
 		QFontMetrics fm(col.title->font());
 		col.title->setText(fm.elidedText(col.source, Qt::ElideRight, width - 4));
@@ -322,7 +406,18 @@ private:
 			b.button->setText(b.button->fontMetrics().elidedText(b.name, Qt::ElideRight, std::max(10, buttonW)));
 	}
 
-	QToolButton *follow, *reserve, *scrollbar;
+	// The toggles sit above the columns, or below them (closer to the Audio Mixer when the dock is under it).
+	void placeBar()
+	{
+		layout->removeItem(bar);
+		layout->insertLayout(barBottom->isChecked() ? layout->count() : 0, bar);
+		barBottom->setText(barBottom->isChecked() ? QStringLiteral("▲") : QStringLiteral("▼"));
+	}
+
+	bool rows = false; // built as rows, for the Audio Mixer's horizontal layout
+	QVBoxLayout *layout;
+	QHBoxLayout *bar;
+	QToolButton *follow, *reserve, *scrollbar, *barBottom;
 	QComboBox *perRow;
 	QScrollArea *scroll;
 	QWidget *content;

@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QSettings>
 
 namespace {
 
@@ -62,6 +63,38 @@ QString PluginMeta::keyOf(const vstex::PluginDescription &d)
 }
 
 PluginMeta::PluginMeta()
+{
+	load();
+	// Parts picked in the installer's custom setup arrive once in this file; from then on Tools decides.
+	QString picked = configPath("install-features.ini");
+	if (QFile::exists(picked)) {
+		QSettings ini(picked, QSettings::IniFormat);
+		for (const char *key : {"featureChainView", "featureMixer", "featureSwitcher"})
+			ui[key] = ini.value(QString("features/") + key, true).toBool();
+		save();
+		QFile::remove(picked);
+	}
+	// Full-size screenshots used to sit next to the thumbnails; they get their own folder so each can be
+	// deleted on its own.
+	const QStringList full = QDir(screenshotDir()).entryList({"*-full.png"}, QDir::Files);
+	if (!full.isEmpty())
+		QDir().mkpath(highResDir());
+	for (const QString &name : full)
+		QFile::rename(screenshotDir() + "/" + name, highResDir() + "/" + name);
+}
+
+void PluginMeta::reload()
+{
+	entries.clear();
+	favoriteNames.clear();
+	favCount = 1;
+	ui = QJsonObject();
+	recentKeys.clear();
+	load();
+	emit changed();
+}
+
+void PluginMeta::load()
 {
 	QFile f(configPath("plugin-meta.json"));
 	if (!f.open(QIODevice::ReadOnly))
@@ -223,7 +256,11 @@ bool PluginMeta::setDataDir(const QString &dir)
 {
 	QString from = dataDir(), to = QDir::cleanPath(dir);
 	if (QDir(from) != QDir(to))
-		for (const char *sub : {"thumbnails", "history", "presets"})
+#ifdef VST_ENIGMAX_LOADER
+		for (const char *sub : {"thumbnails", "screenshots"}) // each module moves only its own folders
+#else
+		for (const char *sub : {"history", "presets"})
+#endif
 			if (!moveTree(from + "/" + sub, to + "/" + sub))
 				return false;
 	setUiValue("dataDir", to);
@@ -236,21 +273,33 @@ QString PluginMeta::screenshotDir() const
 	return dataDir() + "/thumbnails";
 }
 
-void PluginMeta::deleteAllScreenshots()
+QString PluginMeta::highResDir() const
+{
+	return dataDir() + "/screenshots";
+}
+
+void PluginMeta::deleteThumbnails()
 {
 	QDir(screenshotDir()).removeRecursively();
 	emit changed();
 }
 
+void PluginMeta::deleteHighRes()
+{
+	QDir(highResDir()).removeRecursively();
+	emit changed();
+}
+
 QString PluginMeta::filterShotPath(const QString &filterUuid, bool full) const
 {
-	return screenshotDir() + QString("/filter-%1%2.png").arg(filterUuid, full ? "-full" : "");
+	return (full ? highResDir() : screenshotDir()) + QString("/filter-%1%2.png").arg(filterUuid, full ? "-full" : "");
 }
 
 QString PluginMeta::userThumbnailPath(const QString &key, const char *suffix) const
 {
 	QByteArray hash = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1).toHex();
-	return screenshotDir() + QString("/%1%2.png").arg(QString::fromLatin1(hash), QString::fromLatin1(suffix));
+	return (*suffix ? highResDir() : screenshotDir()) +
+	       QString("/%1%2.png").arg(QString::fromLatin1(hash), QString::fromLatin1(suffix));
 }
 
 QString PluginMeta::thumbnailPath(const vstex::PluginDescription &d) const
@@ -289,6 +338,7 @@ void PluginMeta::setFilterShot(const QString &filterUuid, const QImage &image)
 void PluginMeta::saveShot(const QImage &image, const QString &smallPath, const QString &fullPath)
 {
 	QDir().mkpath(QFileInfo(smallPath).path());
+	QDir().mkpath(QFileInfo(fullPath).path());
 	QImage small = image.width() > kThumbMaxWidth ? image.scaledToWidth(kThumbMaxWidth, Qt::SmoothTransformation)
 						      : image;
 	small.save(smallPath, "PNG");

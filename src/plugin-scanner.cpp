@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QSaveFile>
+#include <QSet>
 #include <QTimer>
 
 namespace {
@@ -85,10 +86,14 @@ vstex::PluginDescription fromJson(const QJsonObject &o)
 QStringList findPluginFiles(const QStringList &roots)
 {
 	QStringList found;
+	QSet<QString> seen; // a symlink or junction pointing back up would otherwise loop forever
 	for (const QString &root : roots) {
 		QStringList pending{root};
 		while (!pending.isEmpty()) {
 			QDir dir(pending.takeFirst());
+			if (seen.contains(dir.canonicalPath()))
+				continue;
+			seen.insert(dir.canonicalPath());
 			for (const QFileInfo &fi : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot)) {
 				QString suffix = fi.suffix().toLower();
 				if (suffix == "vst3")

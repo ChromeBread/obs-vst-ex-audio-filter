@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "pitch-filter.h"
+#include "plugin-meta.h"
 #include "stereo-filter.h"
 #include "switch-sets.h"
 #include "ui/ex-filters-dialog.h"
@@ -24,7 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "ui/fx-dock.h"
 #include "ui/switch-dock.h"
 #include "ui/tools-dialog.h"
-#include "vst-filter.h"
+#include "loader-api.h"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -38,18 +39,31 @@ MODULE_EXPORT const char *obs_module_description(void)
 	return obs_module_text("Description");
 }
 
+static void onPluginEdited(void *, calldata_t *cd)
+{
+	ExFiltersDialog::notifyPluginEdited(static_cast<obs_source_t *>(calldata_ptr(cd, "source")));
+}
+
 bool obs_module_load(void)
 {
 	apply_saved_language();
-	register_vst_ex_filter();
 	register_pitch_filter();
 	register_stereo_filter();
-	vst_ex_set_edited_callback(&ExFiltersDialog::notifyPluginEdited);
+	// The loader declares its signals when it loads, possibly after us.
+	obs_frontend_add_event_callback(
+		[](enum obs_frontend_event event, void *) {
+			if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING && loader_installed())
+				signal_handler_connect(obs_get_signal_handler(), "vst_enigmax_edited", onPluginEdited, nullptr);
+		},
+		nullptr);
 	install_mixer_menu_hook();
 	install_tools_menu();
 	switchsets::install();
-	install_switch_dock();
-	install_fx_dock();
+	// Optional parts, chosen in the installer or Tools > VST Ex Audio Filter (read once, at load).
+	if (PluginMeta::instance().uiValue("featureSwitcher").toBool(true))
+		install_switch_dock();
+	if (PluginMeta::instance().uiValue("featureMixer").toBool(true))
+		install_fx_dock();
 	obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
 	return true;
 }
@@ -60,6 +74,7 @@ void obs_module_unload(void)
 	remove_switch_dock();
 	switchsets::uninstall();
 	remove_mixer_menu_hook();
-	vst_ex_set_edited_callback(nullptr);
+	if (loader_installed())
+		signal_handler_disconnect(obs_get_signal_handler(), "vst_enigmax_edited", onPluginEdited, nullptr);
 	obs_log(LOG_INFO, "plugin unloaded");
 }

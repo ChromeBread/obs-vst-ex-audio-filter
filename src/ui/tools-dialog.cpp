@@ -1,7 +1,8 @@
 #include "ui/tools-dialog.h"
 
 #include "plugin-meta.h"
-#include "plugin-scanner.h"
+#include "ui/backup.h"
+#include "loader-api.h"
 #include "ui/chain-view.h"
 #include "ui/ui-text.h"
 
@@ -84,24 +85,13 @@ QString configDir()
 	return path;
 }
 
-QStringList vstFolders()
-{
-	QStringList found;
-	for (const auto &d : PluginCatalog::instance().plugins()) {
-		QString dir = native(QFileInfo(QString::fromStdString(d.path)).absolutePath());
-		if (!found.contains(dir))
-			found << dir;
-	}
-	found.sort(Qt::CaseInsensitive);
-	return found;
-}
-
 } // namespace
 
 void install_tools_menu()
 {
 	obs_frontend_add_tools_menu_item("VST Ex Audio Filter", [](void *) { ToolsDialog::open(); }, nullptr);
-	obs_frontend_add_tools_menu_item("VST Ex Chain View", [](void *) { open_chain_view(); }, nullptr);
+	if (PluginMeta::instance().uiValue("featureChainView").toBool(true))
+		obs_frontend_add_tools_menu_item("VST Ex Chain View", [](void *) { open_chain_view(); }, nullptr);
 	// First run: ask for the data folder once OBS is up, so it is not forgotten.
 	obs_frontend_add_event_callback(
 		[](enum obs_frontend_event event, void *) {
@@ -140,8 +130,10 @@ bool choose_data_folder(QWidget *parent, bool firstRun)
 	dlg.resize(560, dlg.sizeHint().height());
 
 	if (dlg.exec() != QDialog::Accepted) {
-		if (firstRun) // keep the default and don't ask again; it can be changed in Tools
+		if (firstRun) { // keep the default and don't ask again; it can be changed in Tools
 			meta.setDataDir(meta.dataDir());
+			loader_set_data_dir(meta.dataDir()); // one data folder for both modules
+		}
 		return false;
 	}
 	QString dir = QDir::fromNativeSeparators(path->text().trimmed());
@@ -153,6 +145,7 @@ bool choose_data_folder(QWidget *parent, bool firstRun)
 		QMessageBox::warning(parent, T("Tools.DataDir"), T("Tools.DataDir.Failed").arg(path->text()));
 		return false;
 	}
+	loader_set_data_dir(dir);
 	return true;
 }
 
@@ -189,6 +182,7 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	connect(language, &QComboBox::activated, this, [this, language] {
 		QString code = language->currentData().toString();
 		PluginMeta::instance().setUiValue("language", code);
+		loader_set_ui("language", code);
 		obs_module_set_locale(code.toUtf8().constData());
 		// Reopen so this window is in the new language too.
 		close();
@@ -203,7 +197,22 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	connect(hiddenBoth, &QCheckBox::toggled, this, [](bool on) {
 		PluginMeta::instance().setUiValue("hidePluginRows", on);
 		PluginMeta::instance().setUiValue("pickerHidden", on);
+		loader_set_ui("pickerHidden", on);
 	});
+
+	auto *features = new QGroupBox(T("Tools.Features"), this);
+	auto *featureLayout = new QVBoxLayout(features);
+	for (auto [key, text] : {std::pair{"featureChainView", "Tools.Feature.ChainView"},
+				 {"featureMixer", "Tools.Feature.Mixer"},
+				 {"featureSwitcher", "Tools.Feature.Switcher"}}) {
+		auto *box = new QCheckBox(T(text), features);
+		box->setChecked(meta.uiValue(key).toBool(true));
+		connect(box, &QCheckBox::toggled, this, [key](bool on) { PluginMeta::instance().setUiValue(key, on); });
+		featureLayout->addWidget(box);
+	}
+	auto *featureNote = new QLabel(T("Tools.Features.Note"), features);
+	featureNote->setEnabled(false);
+	featureLayout->addWidget(featureNote);
 
 	auto *debug = new QCheckBox(T("Tools.Debug"), this);
 	debug->setChecked(meta.uiValue("debugMode").toBool(false));
@@ -215,7 +224,7 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	form->addRow(T("Tools.Version"), selectable(QString::fromUtf8(PLUGIN_VERSION)));
 	// __DATE__ is "Oct 27 2026" (English, ambiguous order for some readers); parse it, then format per language.
 	QDate built = QLocale::c().toDate(QStringLiteral(__DATE__).simplified(), "MMM d yyyy");
-	// Per-language pattern (e.g. "yyyy年M月d日"), month names from that language.
+	// Per-language pattern with year, month and day marked (e.g. "yyyy'年'-M'月'-d'日'"), so no order is misread.
 	QString builtText = QLocale(currentLanguage()).toString(built, T("Tools.BuildDate.Format"));
 	form->addRow(T("Tools.BuildDate"), selectable(builtText + "  " + QStringLiteral(__TIME__).left(5)));
 	form->addRow(T("Tools.Author"), selectable(QStringLiteral("BlackDream feat. ChromeBread")));
@@ -233,6 +242,7 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::close);
 	auto *layout = new QVBoxLayout(this);
 	layout->addLayout(form);
+	layout->addWidget(features);
 	layout->addWidget(debugSection, 1);
 	layout->addWidget(buttons);
 }
@@ -270,7 +280,6 @@ QWidget *ToolsDialog::buildDebugSection()
 	auto *installedLayout = new QVBoxLayout(installed);
 	installedLayout->addWidget(selectable(
 		QStringList{native(QString::fromUtf8(obs_get_module_binary_path(obs_current_module()))),
-			    native(bin + "/vst-ex-scanner.exe"),
 			    native(QString::fromUtf8(obs_get_module_data_path(obs_current_module())))}
 			.join('\n')));
 	tabs->addTab(installed, T("Tools.Installed"));
@@ -284,64 +293,26 @@ QWidget *ToolsDialog::buildDebugSection()
 					      T("Tools.Uninstall.Data").arg(native(PluginMeta::instance().dataDir()))));
 	tabs->addTab(uninstall, T("Tools.Uninstall"));
 
-	// Screenshots: where they are, how many, how big
-	QString shots = PluginMeta::instance().screenshotDir();
-	int pluginFiles = 0, filterFiles = 0;
-	qint64 bytes = 0;
-	for (QDirIterator it(shots, {"*.png"}, QDir::Files); it.hasNext();) {
-		QFileInfo fi(it.next());
-		bytes += fi.size();
-		(fi.fileName().startsWith("filter-") ? filterFiles : pluginFiles)++;
-	}
-	QString size = QLocale().formattedDataSize(bytes);
-	auto *screenshots = new QWidget(box);
-	auto *shotLayout = new QVBoxLayout(screenshots);
-	shotLayout->addWidget(selectable(native(shots)));
-	shotLayout->addWidget(selectable(T("Tools.Screenshots.Text").arg(pluginFiles).arg(filterFiles).arg(size)));
-	auto *openShots = new QPushButton(T("Tools.OpenFolder"), screenshots);
-	auto *deleteShots = new QPushButton(T("Tools.DeleteShots").arg(size), screenshots);
-	deleteShots->setEnabled(bytes > 0);
-	connect(openShots, &QPushButton::clicked, this, [shots] {
-		QDir().mkpath(shots);
-		QDesktopServices::openUrl(QUrl::fromLocalFile(shots));
+	// Backup: everything both modules keep, to a folder and back
+	auto *backup = new QWidget(box);
+	auto *backupLayout = new QVBoxLayout(backup);
+	backupLayout->addWidget(selectable(T("Backup.Text")));
+	auto *exportAll = new QPushButton(T("Backup.Export"), backup);
+	auto *importAll = new QPushButton(T("Backup.Import"), backup);
+	connect(exportAll, &QPushButton::clicked, this, [this] { export_all_settings(this); });
+	connect(importAll, &QPushButton::clicked, this, [this] {
+		if (import_all_settings(this)) {
+			close(); // reopen with the imported settings
+			QTimer::singleShot(0, [] { ToolsDialog::open(); });
+		}
 	});
-	connect(deleteShots, &QPushButton::clicked, this, [this, size] {
-		if (QMessageBox::question(this, T("Tools.Screenshots"), T("Tools.DeleteShots.Confirm").arg(size)) !=
-		    QMessageBox::Yes)
-			return;
-		PluginMeta::instance().deleteAllScreenshots();
-		close(); // reopen with the new numbers
-		QTimer::singleShot(0, [] { ToolsDialog::open(); });
-	});
-	auto *shotButtons = new QHBoxLayout();
-	shotButtons->addWidget(openShots);
-	shotButtons->addWidget(deleteShots);
-	shotButtons->addStretch(1);
-	shotLayout->addLayout(shotButtons);
-	tabs->addTab(screenshots, T("Tools.Screenshots"));
+	auto *backupButtons = new QHBoxLayout();
+	backupButtons->addWidget(exportAll);
+	backupButtons->addWidget(importAll);
+	backupButtons->addStretch(1);
+	backupLayout->addLayout(backupButtons);
+	backupLayout->addStretch(1);
+	tabs->addTab(backup, T("Backup"));
 
-	// VST folders
-	QStringList search;
-	for (const QString &p : PluginCatalog::instance().searchPaths())
-		search << native(p);
-	QString text = "[" + T("Tools.VstFolders.Search") + "]\n" + search.join('\n') + "\n\n[" +
-		       T("Tools.VstFolders.Found") + "]\n" + vstFolders().join('\n');
-	auto *folders = new QWidget(box);
-	auto *folderLayout = new QVBoxLayout(folders);
-	auto *list = new QPlainTextEdit(text, folders);
-	list->setReadOnly(true);
-	list->setMinimumHeight(120);
-	auto *exportButton = new QPushButton(T("Tools.Export"), folders);
-	connect(exportButton, &QPushButton::clicked, this, [this, text] {
-		QString path = QFileDialog::getSaveFileName(this, T("Tools.Export"), "vst-folders.txt", "Text (*.txt)");
-		if (path.isEmpty())
-			return;
-		QSaveFile f(path);
-		if (!f.open(QIODevice::WriteOnly) || f.write(text.toUtf8()) < 0 || !f.commit())
-			QMessageBox::warning(this, T("Tools.Export"), f.errorString());
-	});
-	folderLayout->addWidget(list, 1);
-	folderLayout->addWidget(exportButton, 0, Qt::AlignLeft);
-	tabs->addTab(folders, T("Tools.VstFolders"));
 	return tabs;
 }

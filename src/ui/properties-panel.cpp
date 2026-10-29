@@ -1,8 +1,7 @@
 #include "ui/properties-panel.h"
 
-#include "plugin-meta.h"
+#include "loader-api.h"
 #include "ui/ui-text.h"
-#include "vst-filter.h"
 
 #include <obs-frontend-api.h>
 
@@ -40,9 +39,16 @@ PropertiesPanel::PropertiesPanel(QWidget *parent) : QScrollArea(parent)
 	setFrameShape(QFrame::NoFrame);
 	fullPreview = new QLabel(this, Qt::ToolTip);
 	fullPreview->setStyleSheet("border:1px solid #888;background:#222;");
-	connect(&PluginMeta::instance(), &PluginMeta::changed, this, [this] {
-		if (picture)
-			scheduleRebuild(); // a new screenshot was taken
+	if (loader_installed())
+		signal_handler_connect(obs_get_signal_handler(), "vst_enigmax_pictures_changed", onPicturesChanged, this);
+}
+
+void PropertiesPanel::onPicturesChanged(void *param, calldata_t *)
+{
+	auto *self = static_cast<PropertiesPanel *>(param);
+	QMetaObject::invokeMethod(self, [self] {
+		if (self->picture)
+			self->scheduleRebuild(); // a new screenshot was taken
 	});
 }
 
@@ -75,22 +81,8 @@ bool PropertiesPanel::eventFilter(QObject *obj, QEvent *event)
 
 void PropertiesPanel::addPluginPicture(QVBoxLayout *layout)
 {
-	vstex::PluginDescription d;
-	d.format = QString::fromUtf8(obs_data_get_string(settings, S_PLUGIN_FORMAT)) == "VST2" ? vstex::PluginFormat::VST2
-												 : vstex::PluginFormat::VST3;
-	d.uid = obs_data_get_string(settings, S_PLUGIN_UID);
-	d.name = obs_data_get_string(settings, S_PLUGIN_NAME);
-	// This filter's own screenshot first; the plugin's thumbnail until one is taken.
-	auto &meta = PluginMeta::instance();
-	QString uuid = QString::fromUtf8(obs_source_get_uuid(src));
-	QString thumb = meta.filterShotPath(uuid, false);
-	if (QFileInfo::exists(thumb)) {
-		QString full = meta.filterShotPath(uuid, true);
-		fullImage = QFileInfo::exists(full) ? full : thumb;
-	} else {
-		thumb = meta.thumbnailPath(d);
-		fullImage = meta.fullImagePath(d);
-	}
+	QString thumb;
+	loader_pictures(src, thumb, fullImage);
 
 	picture = new QLabel();
 	if (thumb.isEmpty()) {
@@ -103,7 +95,7 @@ void PropertiesPanel::addPluginPicture(QVBoxLayout *layout)
 	auto *shot = new QPushButton(QStringLiteral("📷 ") + T("Panel.Screenshot"));
 	shot->setToolTip(T("Panel.Screenshot.Tip"));
 	OBSSource keep = src;
-	connect(shot, &QPushButton::clicked, this, [keep] { vst_ex_capture_screenshot(keep); });
+	connect(shot, &QPushButton::clicked, this, [keep] { loader_call_filter(keep, LOADER_PROC_SCREENSHOT); });
 
 	// Stacked, not side by side, so a narrow panel never pushes the button out of view.
 	layout->addWidget(picture, 0, Qt::AlignLeft);
@@ -112,6 +104,8 @@ void PropertiesPanel::addPluginPicture(QVBoxLayout *layout)
 
 PropertiesPanel::~PropertiesPanel()
 {
+	if (loader_installed())
+		signal_handler_disconnect(obs_get_signal_handler(), "vst_enigmax_pictures_changed", onPicturesChanged, this);
 	if (props)
 		obs_properties_destroy(props);
 }
@@ -159,7 +153,7 @@ void PropertiesPanel::rebuild()
 		memoRow->addRow(T("Col.Memo"), memo);
 		outer->addLayout(memoRow);
 
-		if (strcmp(obs_source_get_unversioned_id(src), VST_EX_FILTER_ID) == 0)
+		if (strcmp(obs_source_get_unversioned_id(src), VST_EX_FILTER_ID) == 0 && loader_installed())
 			addPluginPicture(outer);
 
 		props = obs_source_properties(src);

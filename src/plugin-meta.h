@@ -66,13 +66,17 @@ public:
 	// Moves the existing files over. False (and nothing changed) if they could not be moved.
 	bool setDataDir(const QString &dir);
 
-	// Folder holding all thumbnails and screenshots.
+	// Low-resolution thumbnails (plugin and per-filter), and the full-size screenshots behind them.
 	QString screenshotDir() const;
-	void deleteAllScreenshots();
+	QString highResDir() const;
+	void deleteThumbnails();
+	void deleteHighRes();
 
 	// Small UI preferences (column order, toggles), saved with the rest.
 	QJsonValue uiValue(const QString &key) const { return ui.value(key); }
 	void setUiValue(const QString &key, const QJsonValue &value);
+	// Re-reads plugin-meta.json after it was replaced on disk (backup import).
+	void reload();
 
 signals:
 	void changed();
@@ -80,6 +84,7 @@ signals:
 
 private:
 	PluginMeta();
+	void load();
 	void save() const;
 	static void saveShot(const QImage &image, const QString &smallPath, const QString &fullPath);
 	QString userThumbnailPath(const QString &key, const char *suffix = "") const;
