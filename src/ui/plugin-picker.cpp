@@ -694,12 +694,15 @@ void PluginPicker::refresh()
 		if (i < plugins.size())
 			keepKeys.insert(PluginMeta::keyOf(plugins[i]));
 
+	auto &meta = PluginMeta::instance();
+	const QVector<vstex::PluginDescription> catalog = PluginCatalog::instance().plugins();
+	meta.adoptLegacyKeys(catalog);
+
 	plugins.clear();
-	for (const auto &d : PluginCatalog::instance().plugins())
+	for (const auto &d : catalog)
 		if (d.numInputs > 0) // effects only; instruments have no audio input to process
 			plugins << d;
 
-	auto &meta = PluginMeta::instance();
 	int favCount = meta.favoriteCount();
 	QString needle = search->text().trimmed();
 	int tab = favoriteGroup->checkedId();

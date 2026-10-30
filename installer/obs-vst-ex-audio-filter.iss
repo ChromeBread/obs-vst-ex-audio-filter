@@ -1,11 +1,11 @@
 ; Inno Setup 6.6+ script. Build: cmake --install to a stage folder, then
-;   iscc /DAppVersion=1.2.1 /DStageDir=<stage> installer\obs-vst-ex-audio-filter.iss
+;   iscc /DAppVersion=1.3.0 /DStageDir=<stage> installer\obs-vst-ex-audio-filter.iss
 ; Installs two OBS modules: VST Ex (obs-vst-ex-audio-filter) and VST Enigmax Loader (vst-enigmax-loader).
 ; The custom setup's choices go to install-features.ini, which VST Ex reads once at its next load.
 ; Uninstall asks what to keep; a backup it makes has the same layout as Tools > Debug mode > Backup.
 
 #ifndef AppVersion
-  #define AppVersion "1.2.1"
+  #define AppVersion "1.3.0"
 #endif
 #ifndef StageDir
   #define StageDir "..\build_x64\stage"

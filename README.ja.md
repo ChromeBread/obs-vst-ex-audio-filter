@@ -8,7 +8,7 @@ OBS Studio 用の拡張オーディオフィルタウィンドウです。歌枠
 
 OBS プラグインは 2 つ入ります: **VST Ex** (ウィンドウ・ドック・内蔵フィルタ) と **VST Enigmax Loader** (VST ホスト)。
 VST フィルタは VST Enigmax Loader のものなので、これを削除すると OBS はそのフィルタを読み込めなくなります。
-削除する前に「引き継ぎ」(下記) で OBS 標準の VST 2.x フィルタか atkAudio へ移してください。
+削除する前に、VST2 のフィルタは「引き継ぎ」(下記) で OBS 標準の VST 2.x フィルタへ移してください。
 
 - Windows x64、OBS Studio 31 以降 (33.0 で動作確認)
 - 製作者: BlackDream feat. ChromeBread ・ ライセンス: GPL-2.0
@@ -36,7 +36,7 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
 3. フォルダ内にプラグインが作ったものではないファイル (別のファイルや `.bak` / `.org` など名前を変えた複製)
    があれば一覧にし、1 つずつ削除するか残すかを選べます
 
-## 機能
+## VST Ex Audio Filter
 
 **フィルタ (VST Ex) ウィンドウ** — オーディオミキサーでソースを右クリック > 「フィルタ (VST Ex)」
 - 大きな ON/OFF ボタン、複数選択、ドラッグで並べ替え、複製 (Ctrl+D)、すべて削除、フィルタごとのメモ
@@ -44,58 +44,61 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
 - フィルタごとのレイテンシと合計、Sync Offset で補正するボタン
 - **プリセット**: フィルタチェーン全体の保存 / 適用 / エクスポート / インポート
 - **ON/OFF セット** (Sync Offset・音量つき): 歌の途中で A メロ → サビを一瞬で、ホットキーでも切り替え
-- **4つ打ちで測定**: BPM120 のテスト曲に合わせて手拍子 (またはイヤホンをマイクに当てる) すると Sync Offset を算出。
-  ms 目盛り付きで拡大できる波形を見ながら手動で微調整も可能
+- **4つ打ちで測定**: BPM120 のテスト曲に合わせて手拍子 (またはイヤホンをマイクに当てる) すると Sync Offset を算出。 ms 目盛り付きで拡大できる波形を見ながら手動で微調整も可能
 
-**VST Enigmax Loader** (VST2 / VST3)
-- VST2 と VST3、別プロセスで安全にスキャン (手動開始、所要時間の目安つき)
-- リスト / サムネイル / 詳細表示のブラウザ、並べ替え、検索、お気に入り、HID (非表示)、メモ、使ったもの
-- エディタを初めて開いたときにサムネイルを自動撮影、一括生成も可能。フィルタごとの個別スクリーンショット
-- エディタ画面からプラグイン設定のエクスポート / インポート
-- **引き継ぎ** (ツール > VST Enigmax Loader > デバッグモード): VST フィルタを設定ごとその場で、OBS 標準の「VST 2.x プラグイン」
-  フィルタ (VST2) や「atkAudio PluginHost」(VST3) との間で移します
-- サムネイルと高解像度スクリーンショットは別々のフォルダに保存
+<p><img src="docs/images/preview-filters.png" alt="フィルタ (VST Ex) ウィンドウ" width="49%"> <img src="docs/images/preview-filters-select.png" alt="フィルタ (VST Ex) ウィンドウ、複数選択" width="49%"></p>
+
+*フィルタ (VST Ex) ウィンドウ / フィルタ (VST Ex) ウィンドウ、複数選択*
+
+<p><img src="docs/images/preview-history.png" alt="履歴" width="49%"> <img src="docs/images/preview-sync.png" alt="4つ打ちで Sync Offset を測定" width="49%"></p>
+
+*履歴 / 4つ打ちで Sync Offset を測定*
 
 **内蔵フィルタ**
 - 「VST Ex ピッチ / パン」: 半音単位のピッチとパン。デバイス間のズレ合わせで聞き分けやすくなります
 - 「VST Ex 疑似ステレオ」: DAW なしでモノラルマイクに広がりを作ります (ハース効果)。1 つのフィルタで追加・削除
 
-**ドックとツール**
-- 「VST Ex Switcher」ドック: ON/OFF セットのボタンと CPU 使用率 (OBS 全体と VST の分)
-- 「VST Ex Mixer」ドック: オーディオミキサーのメーターの下にソースごとの列、VST ごとのボタン
-- 「VST Ex Chain View」(ツールメニュー): デバイスから出力までの全ソース、レイテンシ、レベル、サイドチェイン、
-  半円イメージャー (任意)、画像として保存
-- ツール > VST Ex Audio Filter: 言語 (EN / JP / KR / ID / FR / TW)、バージョン、任意の部分のオン / オフ、デバッグ情報、
-  全設定のエクスポート / インポート (デバッグモード)
+- ツール > VST Ex Audio Filter: 言語 (EN / JP / KR / ID / FR / TW)、バージョン、任意の部分のオン / オフ、デバッグ情報、 全設定のエクスポート / インポート (デバッグモード)
 
-## プレビュー
+## VST Enigmax Loader
 
-![VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS](docs/images/preview-obs.png)
-*VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS*
-
-![フィルタ (VST Ex) ウィンドウ](docs/images/preview-filters.png)
-*フィルタ (VST Ex) ウィンドウ*
-
-![フィルタ (VST Ex) ウィンドウ、複数選択](docs/images/preview-filters-select.png)
-*フィルタ (VST Ex) ウィンドウ、複数選択*
-
-![履歴](docs/images/preview-history.png)
-*履歴*
-
-![4つ打ちで Sync Offset を測定](docs/images/preview-sync.png)
-*4つ打ちで Sync Offset を測定*
+- VST2 と VST3、別プロセスで安全にスキャン (手動開始、所要時間の目安つき)
+- リスト / サムネイル / 詳細表示のブラウザ、並べ替え、検索、お気に入り、HID (非表示)、メモ、使ったもの
+- エディタを初めて開いたときにサムネイルを自動撮影、一括生成も可能。フィルタごとの個別スクリーンショット
+- エディタ画面からプラグイン設定のエクスポート / インポート
+- **引き継ぎ** (ツール > VST Enigmax Loader > デバッグモード): VST2 フィルタを設定ごとその場で、OBS 標準の「VST 2.x プラグイン」フィルタとの間で移します
+- サムネイルと高解像度スクリーンショットは別々のフォルダに保存
+- 別フォルダにある同じプラグインは OBS と同じく別の項目として表示し、お気に入り、HID、メモ、サムネイルを 1 つずつ設定できます
 
 ![VST プラグインの選択 (サムネイル表示)](docs/images/preview-browser-thumbnails.png)
 *VST プラグインの選択 (サムネイル表示)*
 
-![VST プラグインの選択 (リスト表示)](docs/images/preview-browser-list.png)
-*VST プラグインの選択 (リスト表示)*
+<p><img src="docs/images/preview-browser-list.png" alt="VST プラグインの選択 (リスト表示)" width="49%"> <img src="docs/images/preview-browser-details.png" alt="VST プラグインの選択 (詳細表示)" width="49%"></p>
 
-![VST プラグインの選択 (詳細表示)](docs/images/preview-browser-details.png)
-*VST プラグインの選択 (詳細表示)*
+*VST プラグインの選択 (リスト表示) / VST プラグインの選択 (詳細表示)*
+
+## VST Ex Chain View
+
+- 「VST Ex Chain View」(ツールメニュー): デバイスから出力までの全ソース、レイテンシ、レベル、サイドチェイン、 半円イメージャー (任意)、画像として保存
+- 表示と保存画像の内容を選べます: アクティブなソースのみ、トラック 1〜6、音量・モノラル・バランス・Sync Offset・音声モニタリングの個別切り替え
+- 行のドラッグでソースを並べ替え、右クリックでソース名の右横にメモ、VST n 個ごとに改行
 
 ![VST Ex Chain View](docs/images/preview-chain.png)
 *VST Ex Chain View*
+
+## VST Ex Mixer
+
+- 「VST Ex Mixer」ドック: オーディオミキサーのメーターの下にソースごとの列、VST ごとのボタン
+
+![VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS](docs/images/preview-obs.png)
+*VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS*
+
+## VST Ex Switcher
+
+- 「VST Ex Switcher」ドック: ON/OFF セットのボタンと CPU 使用率 (OBS 全体と VST の分)
+
+![VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS](docs/images/preview-obs.png)
+*VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS*
 
 ## ビルド
 

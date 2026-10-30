@@ -9,13 +9,17 @@
 #include <obs.hpp>
 
 #include <QCheckBox>
+#include <QContextMenuEvent>
 #include <QDateTime>
 #include <QDialog>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QHash>
 #include <QLabel>
@@ -29,6 +33,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <climits>
 #include <cmath>
 #include <memory>
 #include <mutex>
@@ -38,6 +43,20 @@
 namespace {
 
 constexpr int kBoxW = 160, kBoxH = 52, kGap = 26, kCurveRoom = 20, kMargin = 12; // box size at 100%
+constexpr int kWrapGap = 18, kMemoGap = 12;
+constexpr uint32_t kAllTracks = (1u << MAX_AUDIO_MIXES) - 1;
+
+// Saved in each source's private settings, so they travel with the scene collection.
+const char *kMemoKey = "vstex_chain_memo";
+const char *kOrderKey = "vstex_chain_order";
+
+// What the view (and so the saved image) shows.
+struct ViewOptions {
+	bool activeOnly = false;
+	uint32_t trackMask = kAllTracks;
+	bool volume = true, mono = false, balance = false, sync = true, monitoring = true;
+	int wrapEvery = 0; // filters per line, 0 = never wrap
+};
 
 enum class Kind { Device, Filter, Audio, Output };
 
@@ -53,8 +72,13 @@ struct Node {
 
 struct Row {
 	OBSWeakSource source;
-	QString uuid, name;
+	QString uuid, name, memo;
 	std::vector<Node> nodes;
+	int order = INT_MAX; // sources never moved go last
+	bool active = false;
+	uint32_t mixers = 0;
+	std::vector<QPoint> cells; // column and line of each node
+	int y = 0;
 };
 
 // Level of one source, written on the audio thread by its volmeter.
@@ -146,6 +170,12 @@ public:
 		relayout();
 	}
 
+	void setOptions(const ViewOptions &o)
+	{
+		options = o;
+		rebuild();
+	}
+
 	// Half-circle imager per row; reads audio only while on.
 	void setImager(bool on)
 	{
@@ -167,12 +197,54 @@ public:
 protected:
 	void mouseDoubleClickEvent(QMouseEvent *e) override
 	{
-		int row = (int(e->position().y()) - kMargin) / rowH;
-		if (row < 0 || row >= int(rows.size()))
+		const Row *row = rowAt(int(e->position().y()));
+		if (!row)
 			return;
-		OBSSourceAutoRelease source = obs_weak_source_get_source(rows[row].source);
+		OBSSourceAutoRelease source = obs_weak_source_get_source(row->source);
 		if (source)
 			ExFiltersDialog::open(source);
+	}
+
+	// Drag a row onto another to move it there.
+	void mousePressEvent(QMouseEvent *e) override
+	{
+		const Row *row = e->button() == Qt::LeftButton ? rowAt(int(e->position().y())) : nullptr;
+		dragUuid = row ? row->uuid : QString();
+		dropUuid.clear();
+	}
+
+	void mouseMoveEvent(QMouseEvent *e) override
+	{
+		if (dragUuid.isEmpty())
+			return;
+		const Row *row = rowAt(int(e->position().y()));
+		dropUuid = row && row->uuid != dragUuid ? row->uuid : QString();
+		update();
+	}
+
+	void mouseReleaseEvent(QMouseEvent *) override
+	{
+		if (!dropUuid.isEmpty())
+			moveRow(dragUuid, dropUuid);
+		dragUuid.clear();
+		dropUuid.clear();
+		update();
+	}
+
+	void contextMenuEvent(QContextMenuEvent *e) override
+	{
+		const Row *row = rowAt(e->y());
+		OBSSourceAutoRelease source = row ? obs_weak_source_get_source(row->source) : nullptr;
+		if (!source)
+			return;
+		const QString name = row->name, current = row->memo; // the dialog's event loop may rebuild the rows
+		bool ok = false;
+		QString memo = QInputDialog::getText(this, T("Chain.Memo"), name, QLineEdit::Normal, current, &ok);
+		if (!ok)
+			return;
+		OBSDataAutoRelease priv = obs_source_get_private_settings(source);
+		obs_data_set_string(priv, kMemoKey, memo.trimmed().toUtf8().constData());
+		rebuild();
 	}
 
 	void paintEvent(QPaintEvent *) override
@@ -187,28 +259,48 @@ protected:
 		}
 		QHash<QString, QPoint> outputAnchor; // source name -> bottom of its output box
 		for (size_t r = 0; r < rows.size(); r++)
-			outputAnchor[rows[r].name] = QPoint(boxX(int(rows[r].nodes.size()) - 1) + boxW / 2, rowY(int(r)) + header + boxH);
+			outputAnchor[rows[r].name] = boxOf(rows[r], rows[r].nodes.size() - 1).bottomLeft() + QPoint(boxW / 2, 1);
 
 		for (size_t r = 0; r < rows.size(); r++) {
 			const Row &row = rows[r];
-			int y = rowY(int(r));
+			int y = row.y;
+			if (row.uuid == dropUuid)
+				p.fillRect(0, y, width(), rowHeight(row), QColor(90, 140, 220, 70));
+			QFontMetrics tm(titleFont());
 			p.setFont(titleFont());
 			p.setPen(Qt::white);
-			p.drawText(kMargin, y + QFontMetrics(titleFont()).ascent() + 2, row.name);
+			p.drawText(kMargin, y + tm.ascent() + 2, row.name);
+			if (!row.memo.isEmpty()) {
+				p.setFont(smallFont());
+				p.setPen(QColor(240, 200, 90));
+				p.drawText(kMargin + tm.horizontalAdvance(row.name) + kMemoGap, y + tm.ascent() + 2, row.memo);
+			}
 			for (size_t i = 0; i < row.nodes.size(); i++) {
 				const Node &n = row.nodes[i];
-				QRect box(boxX(int(i)), y + header, boxW, boxH);
-				if (i > 0) { // arrow from the previous box
+				QRect box = boxOf(row, i);
+				if (i > 0 && row.cells[i].y() == row.cells[i - 1].y()) { // arrow from the previous box
 					int ay = box.center().y();
 					p.setPen(QPen(QColor(120, 120, 135), 2));
 					p.drawLine(box.left() - gap + 2, ay, box.left() - 4, ay);
 					p.drawLine(box.left() - 9, ay - 4, box.left() - 4, ay);
 					p.drawLine(box.left() - 9, ay + 4, box.left() - 4, ay);
+				} else if (i > 0) { // wrapped: down from the previous box, back to the start of this line
+					QRect prev = boxOf(row, i - 1);
+					int x = box.center().x(), mid = box.top() - kWrapGap / 2;
+					p.setPen(QPen(QColor(120, 120, 135), 2));
+					p.drawLine(prev.center().x(), prev.bottom(), prev.center().x(), mid);
+					p.drawLine(prev.center().x(), mid, x, mid);
+					p.drawLine(x, mid, x, box.top() - 3);
+					p.drawLine(x - 4, box.top() - 8, x, box.top() - 3);
+					p.drawLine(x + 4, box.top() - 8, x, box.top() - 3);
 				}
 				drawNode(p, box, n, row);
 			}
-			if (imager)
-				drawImager(p, QRect(imagerRight ? boxX(int(row.nodes.size())) : kMargin, y + header, 2 * boxH, boxH), row);
+			if (imager) {
+				QRect last = boxOf(row, row.nodes.size() - 1);
+				QPoint at = imagerRight ? last.topRight() + QPoint(gap + 1, 0) : QPoint(kMargin, y + header);
+				drawImager(p, QRect(at, QSize(2 * boxH, boxH)), row);
+			}
 		}
 		// Sidechain / ducking: a dashed curve from the controlling source's output to the filter that listens.
 		for (size_t r = 0; r < rows.size(); r++)
@@ -216,7 +308,7 @@ protected:
 				const QString &from = rows[r].nodes[i].sidechain;
 				if (from.isEmpty() || !outputAnchor.contains(from))
 					continue;
-				QPoint a = outputAnchor[from], b(boxX(int(i)) + boxW / 2, rowY(int(r)) + header);
+				QPoint a = outputAnchor[from], b = boxOf(rows[r], i).topLeft() + QPoint(boxW / 2, 0);
 				QPainterPath path(a);
 				path.cubicTo(a + QPoint(0, 40), b - QPoint(0, 40), b);
 				p.setPen(QPen(QColor(255, 170, 60), 2, Qt::DashLine));
@@ -229,7 +321,23 @@ protected:
 private:
 	int imagerWidth() const { return imager ? 2 * boxH + gap : 0; }
 	int boxX(int i) const { return kMargin + (imagerRight ? 0 : imagerWidth()) + i * (boxW + gap); }
-	int rowY(int r) const { return kMargin + r * rowH; }
+	QRect boxOf(const Row &row, size_t i) const
+	{
+		const QPoint &cell = row.cells[i];
+		return QRect(boxX(cell.x()), row.y + header + cell.y() * (boxH + kWrapGap), boxW, boxH);
+	}
+	int rowHeight(const Row &row) const
+	{
+		int lines = row.cells.empty() ? 1 : row.cells.back().y() + 1;
+		return header + lines * boxH + (lines - 1) * kWrapGap + kCurveRoom + QFontMetrics(titleFont()).height();
+	}
+	const Row *rowAt(int y) const
+	{
+		for (const Row &row : rows)
+			if (y >= row.y && y < row.y + rowHeight(row))
+				return &row;
+		return nullptr;
+	}
 
 	QFont titleFont() const
 	{
@@ -258,15 +366,28 @@ private:
 		// Never shorter than the three lines of text, or they would spill out of the box.
 		boxH = std::max(int(kBoxH * heightScale), tm.height() + 2 * sm.height() + 10);
 		header = tm.height() + 4;
-		rowH = header + boxH + kCurveRoom + tm.height();
-		size_t widest = 0;
-		for (const Row &row : rows)
-			widest = std::max(widest, row.nodes.size());
-		int rowNameW = 0;
-		for (const Row &row : rows)
-			rowNameW = std::max(rowNameW, tm.horizontalAdvance(row.name));
-		setMinimumSize(std::max(boxX(int(widest)) + (imagerRight ? imagerWidth() : 0), rowNameW + 2 * kMargin) + kMargin,
-			       std::max(120, rowY(int(rows.size())) + kMargin));
+		int columns = 0, rowNameW = 0, y = kMargin;
+		for (Row &row : rows) {
+			int column = 0, line = 0, filters = 0;
+			row.cells.clear();
+			for (const Node &n : row.nodes) {
+				if (n.kind == Kind::Filter && options.wrapEvery > 0 && filters > 0 && filters % options.wrapEvery == 0) {
+					column = 1; // under the first filter
+					line++;
+				}
+				filters += n.kind == Kind::Filter;
+				row.cells.push_back({column++, line});
+			}
+			columns = std::max(columns, column);
+			row.y = y;
+			y += rowHeight(row);
+			int nameW = tm.horizontalAdvance(row.name);
+			if (!row.memo.isEmpty())
+				nameW += kMemoGap + sm.horizontalAdvance(row.memo);
+			rowNameW = std::max(rowNameW, nameW);
+		}
+		setMinimumSize(std::max(boxX(columns) + (imagerRight ? imagerWidth() : 0), rowNameW + 2 * kMargin) + kMargin,
+			       std::max(120, y + kMargin));
 		update();
 	}
 
@@ -347,6 +468,17 @@ private:
 			this);
 		next.swap(building);
 
+		std::stable_sort(next.begin(), next.end(), [](const Row &a, const Row &b) { return a.order < b.order; });
+		order.clear();
+		for (const Row &row : next)
+			order << row.uuid;
+		next.erase(std::remove_if(next.begin(), next.end(),
+					  [this](const Row &row) {
+						  return (options.activeOnly && !row.active) ||
+							 (options.trackMask != kAllTracks && !(row.mixers & options.trackMask));
+					  }),
+			   next.end());
+
 		// Meters follow the rows: keep the ones still needed, add new ones, drop the rest.
 		std::unordered_map<QString, std::unique_ptr<Meter>> keep;
 		for (const Row &row : next) {
@@ -364,12 +496,34 @@ private:
 		relayout();
 	}
 
+	// Moves `from` to the place of `to` among all sources, including the ones filtered out right now.
+	void moveRow(const QString &from, const QString &to)
+	{
+		int target = (int)order.indexOf(to);
+		order.removeOne(from);
+		order.insert(target, from);
+		for (int i = 0; i < order.size(); i++) {
+			OBSSourceAutoRelease source = obs_get_source_by_uuid(order[i].toUtf8().constData());
+			if (!source)
+				continue;
+			OBSDataAutoRelease priv = obs_source_get_private_settings(source);
+			obs_data_set_int(priv, kOrderKey, i);
+		}
+		rebuild();
+	}
+
 	void addRow(obs_source_t *source)
 	{
 		Row row;
 		row.source = OBSGetWeakRef(source);
 		row.uuid = QString::fromUtf8(obs_source_get_uuid(source));
 		row.name = QString::fromUtf8(obs_source_get_name(source));
+		row.active = obs_source_active(source);
+		row.mixers = obs_source_get_audio_mixers(source);
+		OBSDataAutoRelease priv = obs_source_get_private_settings(source);
+		row.memo = QString::fromUtf8(obs_data_get_string(priv, kMemoKey));
+		if (obs_data_has_user_value(priv, kOrderKey))
+			row.order = (int)obs_data_get_int(priv, kOrderKey);
 
 		row.nodes.push_back({Kind::Device, deviceName(source),
 				     QString::fromUtf8(obs_source_get_display_name(obs_source_get_id(source))), QString(),
@@ -411,17 +565,31 @@ private:
 		int64_t offsetMs = obs_source_get_sync_offset(source) / 1000000;
 		float vol = obs_source_get_volume(source);
 		QString db = vol > 0 ? QString::number(20.0 * std::log10(vol), 'f', 1) + " dB" : QStringLiteral("-inf dB");
-		row.nodes.push_back({Kind::Audio, T("Chain.Audio"), QString("Sync %1 ms").arg(offsetMs), db,
-				     !obs_source_muted(source), QString()});
+		QStringList first, second;
+		if (options.sync)
+			first << QString("Sync %1 ms").arg(offsetMs);
+		if (options.volume)
+			first << db;
+		if (options.mono)
+			second << T((obs_source_get_flags(source) & OBS_SOURCE_FLAG_FORCE_MONO) ? "Chain.Mono" : "Chain.Stereo");
+		if (options.balance)
+			second << T("Chain.BalanceValue").arg(qRound(obs_source_get_balance_value(source) * 100.0f));
+		if (first.isEmpty())
+			first.swap(second);
+		if (!first.isEmpty())
+			row.nodes.push_back({Kind::Audio, T("Chain.Audio"), first.join(" · "), second.join(" · "),
+					     !obs_source_muted(source), QString()});
 
 		QStringList tracks;
-		uint32_t mixers = obs_source_get_audio_mixers(source);
 		for (int t = 0; t < MAX_AUDIO_MIXES; t++)
-			if (mixers & (1u << t))
+			if (row.mixers & (1u << t))
 				tracks << QString::number(t + 1);
 		static const char *monitorKeys[] = {"Chain.Monitor.Off", "Chain.Monitor.Only", "Chain.Monitor.Both"};
 		QString monitor = T(monitorKeys[std::clamp(int(obs_source_get_monitoring_type(source)), 0, 2)]);
-		row.nodes.push_back({Kind::Output, T("Chain.Output"), "Tr " + (tracks.isEmpty() ? "-" : tracks.join(' ')) + " · " + monitor,
+		QString output = "Tr " + (tracks.isEmpty() ? "-" : tracks.join(' '));
+		if (options.monitoring)
+			output += " · " + monitor;
+		row.nodes.push_back({Kind::Output, T("Chain.Output"), output,
 				     T("Chain.Total").arg(totalMs + double(offsetMs), 0, 'f', 1), true, QString()});
 		building.push_back(std::move(row));
 	}
@@ -450,11 +618,14 @@ private:
 	}
 
 	std::vector<Row> rows, building;
+	ViewOptions options;
+	QStringList order;          // uuids of all audio sources, shown or not
+	QString dragUuid, dropUuid; // row being dragged, row under it
 	std::unordered_map<QString, std::unique_ptr<Meter>> meters; // by source uuid
 	QHash<QString, QString> deviceNames;
 	double textScale = 1.0, widthScale = 1.0, heightScale = 1.0;
 	bool fullTitles = true, imager = false, imagerRight = false;
-	int boxW = kBoxW, boxH = kBoxH, gap = kGap, header = 20, rowH = 100;
+	int boxW = kBoxW, boxH = kBoxH, gap = kGap, header = 20;
 	QTimer modelTimer, paintTimer;
 };
 
@@ -509,6 +680,46 @@ void open_chain_view()
 	QObject::connect(imagerRight, &QCheckBox::toggled, canvas, &ChainCanvas::setImagerRight);
 	apply();
 
+	auto *activeOnly = new QCheckBox(T("Chain.ActiveOnly"), dlg);
+	std::vector<QCheckBox *> tracks;
+	for (int t = 0; t < MAX_AUDIO_MIXES; t++) {
+		tracks.push_back(new QCheckBox(QString::number(t + 1), dlg));
+		tracks.back()->setChecked(true);
+	}
+	const ViewOptions defaults;
+	auto *showVolume = new QCheckBox(T("Chain.Volume"), dlg);
+	auto *showMono = new QCheckBox(T("Chain.Mono"), dlg);
+	auto *showBalance = new QCheckBox(T("Chain.Balance"), dlg);
+	auto *showSync = new QCheckBox(T("Chain.Sync"), dlg);
+	auto *showMonitoring = new QCheckBox(T("Chain.Monitoring"), dlg);
+	showVolume->setChecked(defaults.volume);
+	showMono->setChecked(defaults.mono);
+	showBalance->setChecked(defaults.balance);
+	showSync->setChecked(defaults.sync);
+	showMonitoring->setChecked(defaults.monitoring);
+	auto *wrapEvery = new QSpinBox(dlg);
+	wrapEvery->setRange(0, 32);
+	wrapEvery->setSpecialValueText(T("Chain.WrapOff"));
+	auto applyOptions = [=] {
+		ViewOptions o;
+		o.activeOnly = activeOnly->isChecked();
+		o.trackMask = 0;
+		for (int t = 0; t < MAX_AUDIO_MIXES; t++)
+			o.trackMask |= tracks[t]->isChecked() ? 1u << t : 0;
+		o.volume = showVolume->isChecked();
+		o.mono = showMono->isChecked();
+		o.balance = showBalance->isChecked();
+		o.sync = showSync->isChecked();
+		o.monitoring = showMonitoring->isChecked();
+		o.wrapEvery = wrapEvery->value();
+		canvas->setOptions(o);
+	};
+	std::vector<QCheckBox *> optionBoxes = {activeOnly, showVolume, showMono, showBalance, showSync, showMonitoring};
+	optionBoxes.insert(optionBoxes.end(), tracks.begin(), tracks.end());
+	for (QCheckBox *box : optionBoxes)
+		QObject::connect(box, &QCheckBox::toggled, dlg, applyOptions);
+	QObject::connect(wrapEvery, &QSpinBox::valueChanged, dlg, applyOptions);
+
 	auto *save = new QPushButton(T("Chain.SaveImage"), dlg);
 	QObject::connect(save, &QPushButton::clicked, dlg, [dlg, canvas] {
 		QString dir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
@@ -533,10 +744,25 @@ void open_chain_view()
 	controls->addWidget(imagerRight);
 	controls->addStretch(1);
 	controls->addWidget(save);
+	auto *filters = new QHBoxLayout();
+	filters->addWidget(activeOnly);
+	filters->addSpacing(16);
+	filters->addWidget(new QLabel(T("Chain.Tracks"), dlg));
+	for (QCheckBox *track : tracks)
+		filters->addWidget(track);
+	filters->addSpacing(16);
+	filters->addWidget(new QLabel(T("Chain.Show"), dlg));
+	for (QCheckBox *box : {showVolume, showMono, showBalance, showSync, showMonitoring})
+		filters->addWidget(box);
+	filters->addSpacing(16);
+	filters->addWidget(new QLabel(T("Chain.WrapEvery"), dlg));
+	filters->addWidget(wrapEvery);
+	filters->addStretch(1);
 	auto *hint = new QLabel(T("Chain.Hint"), dlg);
 	hint->setEnabled(false);
 	auto *layout = new QVBoxLayout(dlg);
 	layout->addLayout(controls);
+	layout->addLayout(filters);
 	layout->addWidget(scroll, 1);
 	layout->addWidget(hint);
 	openView = dlg;

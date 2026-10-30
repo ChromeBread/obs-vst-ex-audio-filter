@@ -166,6 +166,7 @@ void filter_pictures(obs_source_t *source, QString &thumb, QString &full)
 	vstex::PluginDescription d;
 	d.format = strcmp(obs_data_get_string(settings, S_PLUGIN_FORMAT), "VST2") == 0 ? vstex::PluginFormat::VST2
 										      : vstex::PluginFormat::VST3;
+	d.path = obs_data_get_string(settings, S_PLUGIN_PATH);
 	d.uid = obs_data_get_string(settings, S_PLUGIN_UID);
 	d.name = obs_data_get_string(settings, S_PLUGIN_NAME);
 	thumb = meta.thumbnailPath(d);

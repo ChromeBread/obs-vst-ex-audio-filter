@@ -26,6 +26,8 @@ public:
 
 	static PluginMeta &instance();
 	static QString keyOf(const vstex::PluginDescription &d);
+	// Moves data saved before keys held the file path onto these scanned plugins, once. Saves if anything moved.
+	void adoptLegacyKeys(QVector<vstex::PluginDescription> plugins);
 
 	Entry get(const QString &key) const { return entries.value(key); }
 	void setHidden(const QString &key, bool hidden);
@@ -88,6 +90,7 @@ private:
 	void save() const;
 	static void saveShot(const QImage &image, const QString &smallPath, const QString &fullPath);
 	QString userThumbnailPath(const QString &key, const char *suffix = "") const;
+	QString userShot(const vstex::PluginDescription &d, const char *suffix = "") const;
 
 	QHash<QString, Entry> entries;
 	QStringList favoriteNames;

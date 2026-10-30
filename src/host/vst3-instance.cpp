@@ -118,6 +118,34 @@ public:
 	std::function<void(int, int)> onResize;
 };
 
+// PlugProvider's ConnectionProxy drops messages sent off the UI thread, so analyzer data sent from process() would
+// never reach the editor. Connect component and controller directly instead.
+class DirectPlugProvider final : public PlugProvider {
+public:
+	using PlugProvider::PlugProvider;
+	~DirectPlugProvider() override
+	{
+		if (componentPoint && controllerPoint) {
+			componentPoint->disconnect(controllerPoint);
+			controllerPoint->disconnect(componentPoint);
+		}
+	}
+
+	void connectDirectly()
+	{
+		if (!componentCP) // single-component plugin: nothing is connected
+			return;
+		disconnectComponents();
+		componentPoint = U::cast<IConnectionPoint>(component);
+		controllerPoint = U::cast<IConnectionPoint>(controller);
+		componentPoint->connect(controllerPoint);
+		controllerPoint->connect(componentPoint);
+	}
+
+private:
+	IPtr<IConnectionPoint> componentPoint, controllerPoint;
+};
+
 class Vst3Instance final : public PluginInstance {
 public:
 	~Vst3Instance() override
@@ -147,11 +175,12 @@ public:
 				continue;
 			if (!uid.empty() && ci.ID().toString() != uid)
 				continue;
-			provider = owned(new PlugProvider(factory, ci, true));
+			provider = owned(new DirectPlugProvider(factory, ci, true));
 			if (!provider->initialize()) {
 				error = "failed to initialize " + ci.name();
 				return false;
 			}
+			provider->connectDirectly();
 			desc = describe(path, ci);
 			break;
 		}
@@ -223,7 +252,7 @@ public:
 		memset(&context, 0, sizeof(context));
 		context.sampleRate = sampleRate;
 		context.tempo = 120.0;
-		context.state = ProcessContext::kTempoValid;
+		context.state = ProcessContext::kPlaying | ProcessContext::kTempoValid; // analyzers can idle while stopped
 		data.processContext = &context;
 
 		processor->setProcessing(true);
@@ -355,7 +384,7 @@ private:
 	}
 
 	VST3::Hosting::Module::Ptr module;
-	IPtr<PlugProvider> provider;
+	IPtr<DirectPlugProvider> provider;
 	IPtr<IComponent> component;
 	IPtr<IAudioProcessor> processor;
 	IPtr<IEditController> controller;

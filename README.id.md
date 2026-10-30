@@ -7,8 +7,8 @@ tampilan rantai, ditambah **VST Enigmax Loader**, host **VST2 / VST3** miliknya 
 bekerja pada rantai filter yang sama dengan jendela *Filter* bawaan OBS, jadi keduanya bisa dipakai.
 
 Dua plugin OBS dipasang: **VST Ex** (jendela, dock, dan filter bawaan) dan **VST Enigmax Loader** (host VST).
-Filter VST milik VST Enigmax Loader: jika dihapus, OBS tidak bisa memuatnya lagi. Pindahkan dulu ke filter VST 2.x
-bawaan OBS atau ke atkAudio dengan *Serah terima* (lihat di bawah).
+Filter VST milik VST Enigmax Loader: jika dihapus, OBS tidak bisa memuatnya lagi. Pindahkan dulu filter VST2 ke filter VST 2.x
+bawaan OBS dengan *Serah terima* (lihat di bawah).
 
 - Windows x64, OBS Studio 31 atau lebih baru (diuji di 33.0)
 - Pembuat: BlackDream feat. ChromeBread · Lisensi: GPL-2.0
@@ -36,7 +36,7 @@ ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `obs-vst-ex-audio-filter`
 3. menampilkan file di foldernya yang bukan buatannya (file lain, salinan berganti nama seperti `.bak` / `.org`)
    dan membiarkan Anda menghapus atau menyimpan masing-masing.
 
-## Fitur
+## VST Ex Audio Filter
 
 **Jendela Filter (VST Ex)** — Audio Mixer: klik kanan sumber > *Filter (VST Ex)*
 - Tombol ON/OFF besar, pilih banyak, seret untuk mengurutkan, duplikat (Ctrl+D), hapus semua, catatan per filter
@@ -44,59 +44,61 @@ ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `obs-vst-ex-audio-filter`
 - Latensi per filter, total latensi, dan tombol untuk mengompensasinya lewat Sync Offset
 - **Preset**: simpan / terapkan / ekspor / impor seluruh rantai filter
 - **Set ON/OFF** dengan Sync Offset dan volume: ganti verse → chorus seketika di tengah lagu, juga lewat hotkey
-- **Ukur dengan 4 ketukan**: lagu tes BPM120 diputar, Anda bertepuk mengikuti (atau tempelkan earphone ke mik)
-  dan Sync Offset dihitung; gelombang yang bisa di-zoom dengan penggaris milidetik untuk penyetelan manual
+- **Ukur dengan 4 ketukan**: lagu tes BPM120 diputar, Anda bertepuk mengikuti (atau tempelkan earphone ke mik) dan Sync Offset dihitung; gelombang yang bisa di-zoom dengan penggaris milidetik untuk penyetelan manual
 
-**VST Enigmax Loader** (VST2 / VST3)
-- VST2 dan VST3, pemindaian aman di proses terpisah (dimulai oleh Anda, dengan perkiraan waktu)
-- Penjelajah dengan tampilan daftar / gambar mini / detail, urutkan, cari, favorit, tanda HID (sembunyi),
-  catatan, terakhir dipakai
-- Gambar mini otomatis saat editor pertama kali dibuka, atau sekaligus; tangkapan layar per filter
-- Ekspor / impor pengaturan plugin dari jendela editor
-- **Serah terima** (Alat > VST Enigmax Loader > Mode debug): memindahkan filter VST di tempat, beserta pengaturannya, ke dan dari
-  filter *VST 2.x Plug-in* bawaan OBS (VST2) dan *atkAudio PluginHost* (VST3).
-- Thumbnail dan tangkapan layar resolusi tinggi disimpan di folder terpisah
+<p><img src="docs/images/preview-filters.png" alt="Jendela Filter (VST Ex)" width="49%"> <img src="docs/images/preview-filters-select.png" alt="Jendela Filter (VST Ex), beberapa filter dipilih" width="49%"></p>
+
+*Jendela Filter (VST Ex) / Jendela Filter (VST Ex), beberapa filter dipilih*
+
+<p><img src="docs/images/preview-history.png" alt="Riwayat" width="49%"> <img src="docs/images/preview-sync.png" alt="Sync Offset dari 4 ketukan" width="49%"></p>
+
+*Riwayat / Sync Offset dari 4 ketukan*
 
 **Filter bawaan**
 - *VST Ex Pitch / Pan*: pitch per semitone dan pan, memudahkan membedakan perangkat saat menyelaraskan
 - *VST Ex Pseudo Stereo*: melebarkan mik mono tanpa DAW (efek Haas), satu filter untuk ditambah atau dihapus
 
-**Dock dan alat**
-- Dock *VST Ex Switcher*: tombol set ON/OFF dan penggunaan CPU (total OBS dan bagian VST)
-- Dock *VST Ex Mixer*: satu kolom per sumber di bawah meter Audio Mixer, satu tombol per VST
-- *VST Ex Chain View* (menu Alat): semua sumber dari perangkat ke output, latensi, level, sidechain,
-  imager setengah lingkaran (opsional), simpan sebagai gambar
-- Alat > VST Ex Audio Filter: bahasa (EN / JP / KR / ID / FR / TW), versi, bagian opsional, info debug,
-  ekspor / impor semua pengaturan (mode debug)
+- Alat > VST Ex Audio Filter: bahasa (EN / JP / KR / ID / FR / TW), versi, bagian opsional, info debug, ekspor / impor semua pengaturan (mode debug)
 
-## Pratinjau
+## VST Enigmax Loader
 
-![OBS dengan dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-obs.png)
-*OBS dengan dock VST Ex Mixer dan VST Ex Switcher*
-
-![Jendela Filter (VST Ex)](docs/images/preview-filters.png)
-*Jendela Filter (VST Ex)*
-
-![Jendela Filter (VST Ex), beberapa filter dipilih](docs/images/preview-filters-select.png)
-*Jendela Filter (VST Ex), beberapa filter dipilih*
-
-![Riwayat](docs/images/preview-history.png)
-*Riwayat*
-
-![Sync Offset dari 4 ketukan](docs/images/preview-sync.png)
-*Sync Offset dari 4 ketukan*
+- VST2 dan VST3, pemindaian aman di proses terpisah (dimulai oleh Anda, dengan perkiraan waktu)
+- Penjelajah dengan tampilan daftar / gambar mini / detail, urutkan, cari, favorit, tanda HID (sembunyi), catatan, terakhir dipakai
+- Gambar mini otomatis saat editor pertama kali dibuka, atau sekaligus; tangkapan layar per filter
+- Ekspor / impor pengaturan plugin dari jendela editor
+- **Serah terima** (Alat > VST Enigmax Loader > Mode debug): memindahkan filter VST2 di tempat, beserta pengaturannya, ke dan dari filter *VST 2.x Plug-in* bawaan OBS.
+- Thumbnail dan tangkapan layar resolusi tinggi disimpan di folder terpisah
+- Salinan plugin di folder berbeda adalah entri terpisah, seperti di OBS: favorit, HID, catatan, dan gambar mini diatur satu per satu
 
 ![Pilih Plugin VST (tampilan gambar mini)](docs/images/preview-browser-thumbnails.png)
 *Pilih Plugin VST (tampilan gambar mini)*
 
-![Pilih Plugin VST (tampilan daftar)](docs/images/preview-browser-list.png)
-*Pilih Plugin VST (tampilan daftar)*
+<p><img src="docs/images/preview-browser-list.png" alt="Pilih Plugin VST (tampilan daftar)" width="49%"> <img src="docs/images/preview-browser-details.png" alt="Pilih Plugin VST (tampilan detail)" width="49%"></p>
 
-![Pilih Plugin VST (tampilan detail)](docs/images/preview-browser-details.png)
-*Pilih Plugin VST (tampilan detail)*
+*Pilih Plugin VST (tampilan daftar) / Pilih Plugin VST (tampilan detail)*
+
+## VST Ex Chain View
+
+- *VST Ex Chain View* (menu Alat): semua sumber dari perangkat ke output, latensi, level, sidechain, imager setengah lingkaran (opsional), simpan sebagai gambar
+- Pilih yang ditampilkan dan disimpan sebagai gambar: hanya sumber aktif, trek 1 sampai 6, serta volume, mono, keseimbangan, Sync Offset, dan pemantauan audio satu per satu
+- Seret baris untuk mengurutkan sumber, klik kanan untuk menulis memo di sebelah nama sumber, baris baru setiap N VST
 
 ![VST Ex Chain View](docs/images/preview-chain.png)
 *VST Ex Chain View*
+
+## VST Ex Mixer
+
+- Dock *VST Ex Mixer*: satu kolom per sumber di bawah meter Audio Mixer, satu tombol per VST
+
+![OBS dengan dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-obs.png)
+*OBS dengan dock VST Ex Mixer dan VST Ex Switcher*
+
+## VST Ex Switcher
+
+- Dock *VST Ex Switcher*: tombol set ON/OFF dan penggunaan CPU (total OBS dan bagian VST)
+
+![OBS dengan dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-obs.png)
+*OBS dengan dock VST Ex Mixer dan VST Ex Switcher*
 
 ## Build
 

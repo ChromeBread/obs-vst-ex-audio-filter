@@ -11,7 +11,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QSet>
 #include <QSettings>
+
+#include <algorithm>
 
 namespace {
 
@@ -47,6 +50,13 @@ bool moveTree(const QString &from, const QString &to)
 	return true;
 }
 
+// The key used before copies of a plugin were told apart; thumbnails saved back then are still named after it.
+QString legacyKey(const vstex::PluginDescription &d)
+{
+	return QString("%1|%2|%3").arg(vstex::formatName(d.format), QString::fromStdString(d.uid),
+				       QString::fromStdString(d.name));
+}
+
 } // namespace
 
 PluginMeta &PluginMeta::instance()
@@ -55,11 +65,46 @@ PluginMeta &PluginMeta::instance()
 	return meta;
 }
 
-// Format + uid + name: stays the same when a plugin is reinstalled to another folder.
+// One key per file, the way OBS tells plugins apart by path: copies in two folders are separate.
 QString PluginMeta::keyOf(const vstex::PluginDescription &d)
 {
-	return QString("%1|%2|%3").arg(vstex::formatName(d.format), QString::fromStdString(d.uid),
-				       QString::fromStdString(d.name));
+	return legacyKey(d) + "|" + QDir::cleanPath(QString::fromStdString(d.path)).toLower();
+}
+
+// Hidden stays on every copy (nothing hidden reappears); favorites, memo and the recent list go to the first copy only.
+void PluginMeta::adoptLegacyKeys(QVector<vstex::PluginDescription> plugins)
+{
+	std::sort(plugins.begin(), plugins.end(), [](const auto &a, const auto &b) {
+		return QString::fromStdString(a.path).compare(QString::fromStdString(b.path), Qt::CaseInsensitive) < 0;
+	});
+	QSet<QString> adopted;
+	for (const auto &d : plugins) {
+		QString legacy = legacyKey(d);
+		auto old = entries.constFind(legacy);
+		if (old == entries.constEnd() && !recentKeys.contains(legacy))
+			continue;
+		if (old != entries.constEnd()) {
+			Entry from = old.value();
+			Entry &to = entries[keyOf(d)];
+			to.hidden = to.hidden || from.hidden;
+			if (!adopted.contains(legacy)) {
+				to.favorites |= from.favorites;
+				if (to.memo.isEmpty())
+					to.memo = from.memo;
+			}
+		}
+		int recent = (int)recentKeys.indexOf(legacy);
+		if (recent >= 0)
+			recentKeys[recent] = keyOf(d);
+		adopted.insert(legacy);
+	}
+	if (adopted.isEmpty())
+		return;
+	QString path = configPath("plugin-meta.json");
+	QFile::copy(path, path + ".before-file-keys"); // keeps the first backup: copy fails if it exists
+	for (const QString &legacy : adopted)
+		entries.remove(legacy);
+	save();
 }
 
 PluginMeta::PluginMeta()
@@ -302,10 +347,21 @@ QString PluginMeta::userThumbnailPath(const QString &key, const char *suffix) co
 	       QString("/%1%2.png").arg(QString::fromLatin1(hash), QString::fromLatin1(suffix));
 }
 
+// This file's own picture, else one saved under the legacy key (shared by its copies until each gets its own).
+QString PluginMeta::userShot(const vstex::PluginDescription &d, const char *suffix) const
+{
+	for (const QString &key : {keyOf(d), legacyKey(d)}) {
+		QString path = userThumbnailPath(key, suffix);
+		if (QFileInfo::exists(path))
+			return path;
+	}
+	return QString();
+}
+
 QString PluginMeta::thumbnailPath(const vstex::PluginDescription &d) const
 {
-	QString user = userThumbnailPath(keyOf(d));
-	if (QFileInfo::exists(user))
+	QString user = userShot(d);
+	if (!user.isEmpty())
 		return user;
 	QString bundled = QString::fromStdString(d.snapshot);
 	return !bundled.isEmpty() && QFileInfo::exists(bundled) ? bundled : QString();
@@ -313,13 +369,13 @@ QString PluginMeta::thumbnailPath(const vstex::PluginDescription &d) const
 
 bool PluginMeta::hasUserThumbnail(const vstex::PluginDescription &d) const
 {
-	return QFileInfo::exists(userThumbnailPath(keyOf(d)));
+	return !userShot(d).isEmpty();
 }
 
 QString PluginMeta::fullImagePath(const vstex::PluginDescription &d) const
 {
-	QString full = userThumbnailPath(keyOf(d), "-full");
-	return QFileInfo::exists(full) ? full : thumbnailPath(d);
+	QString full = userShot(d, "-full");
+	return !full.isEmpty() ? full : thumbnailPath(d);
 }
 
 void PluginMeta::setThumbnail(const vstex::PluginDescription &d, const QImage &image)
