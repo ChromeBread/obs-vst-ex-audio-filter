@@ -375,7 +375,7 @@ private:
 	double viewStart = 0, viewSpan = kVisibleMs, dragX = 0, dragStart = 0;
 };
 
-// VirtualDJ-style beat counter: four blocks for the beats of the current bar (the first one accented), and a
+// Beat counter: four blocks for the beats of the current bar (the first one accented), and a
 // row below for where the bar is: count-in, then the song's bars. Driven by what the reference actually played
 // (from the first click it heard), never by a timer of its own, so it cannot run ahead of the sound.
 class BeatBar : public QWidget {

@@ -1,6 +1,7 @@
 #include "ui/chain-view.h"
 
 #include "dsp/polar.h"
+#include "plugin-meta.h"
 
 #include "ui/ex-filters-dialog.h"
 #include "ui/ui-text.h"
@@ -22,6 +23,7 @@
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QHash>
+#include <QJsonObject>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
@@ -518,7 +520,8 @@ private:
 		row.source = OBSGetWeakRef(source);
 		row.uuid = QString::fromUtf8(obs_source_get_uuid(source));
 		row.name = QString::fromUtf8(obs_source_get_name(source));
-		row.active = obs_source_active(source);
+		// Same test as OBS's Audio Mixer: e.g. a browser source playing no sound is in the scene but not an audio source yet.
+		row.active = obs_source_active(source) && obs_source_audio_active(source);
 		row.mixers = obs_source_get_audio_mixers(source);
 		OBSDataAutoRelease priv = obs_source_get_private_settings(source);
 		row.memo = QString::fromUtf8(obs_data_get_string(priv, kMemoKey));
@@ -719,6 +722,34 @@ void open_chain_view()
 	for (QCheckBox *box : optionBoxes)
 		QObject::connect(box, &QCheckBox::toggled, dlg, applyOptions);
 	QObject::connect(wrapEvery, &QSpinBox::valueChanged, dlg, applyOptions);
+
+	// Every control comes back as it was left. Connected after loading, so loading itself saves nothing.
+	std::vector<std::pair<QString, QSlider *>> savedSliders = {{"text", textSize}, {"width", boxWidth}, {"height", boxHeight}};
+	std::vector<std::pair<QString, QCheckBox *>> savedBoxes = {
+		{"fullTitles", fullTitles},   {"imager", imager},       {"imagerRight", imagerRight},
+		{"activeOnly", activeOnly},   {"volume", showVolume},   {"mono", showMono},
+		{"balance", showBalance},     {"sync", showSync},       {"monitoring", showMonitoring}};
+	for (int t = 0; t < MAX_AUDIO_MIXES; t++)
+		savedBoxes.emplace_back(QString("track%1").arg(t + 1), tracks[t]);
+	const QJsonObject saved = PluginMeta::instance().uiValue("chainView").toObject();
+	for (auto &[key, slider] : savedSliders)
+		slider->setValue(saved[key].toInt(slider->value()));
+	for (auto &[key, box] : savedBoxes)
+		box->setChecked(saved[key].toBool(box->isChecked()));
+	wrapEvery->setValue(saved["wrapEvery"].toInt(wrapEvery->value()));
+	auto saveView = [=] {
+		QJsonObject view{{"wrapEvery", wrapEvery->value()}};
+		for (auto &[key, slider] : savedSliders)
+			view[key] = slider->value();
+		for (auto &[key, box] : savedBoxes)
+			view[key] = box->isChecked();
+		PluginMeta::instance().setUiValue("chainView", view);
+	};
+	for (auto &[key, slider] : savedSliders)
+		QObject::connect(slider, &QSlider::valueChanged, dlg, saveView);
+	for (auto &[key, box] : savedBoxes)
+		QObject::connect(box, &QCheckBox::toggled, dlg, saveView);
+	QObject::connect(wrapEvery, &QSpinBox::valueChanged, dlg, saveView);
 
 	auto *save = new QPushButton(T("Chain.SaveImage"), dlg);
 	QObject::connect(save, &QPushButton::clicked, dlg, [dlg, canvas] {

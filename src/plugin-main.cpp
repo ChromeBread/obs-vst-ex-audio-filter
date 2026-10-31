@@ -22,9 +22,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "switch-sets.h"
 #include "ui/ex-filters-dialog.h"
 #include "ui/menu-hook.h"
+#include "master-bus.h"
 #include "ui/fx-dock.h"
+#include "ui/master-dock.h"
 #include "ui/switch-dock.h"
 #include "ui/tools-dialog.h"
+#include "ui/waveline-dock.h"
 #include "loader-api.h"
 
 #include <obs-frontend-api.h>
@@ -59,19 +62,27 @@ bool obs_module_load(void)
 	install_mixer_menu_hook();
 	install_tools_menu();
 	switchsets::install();
+	masterbus::install(); // always, locked or not: its saved filters must survive in the scene collection
 	// Optional parts, chosen in the installer or Tools > VST Ex Audio Filter (read once, at load).
 	if (PluginMeta::instance().uiValue("featureSwitcher").toBool(true))
 		install_switch_dock();
 	if (PluginMeta::instance().uiValue("featureMixer").toBool(true))
 		install_fx_dock();
+	if (masterbus::unlocked())
+		install_master_dock();
+	if (PluginMeta::instance().uiValue("featureWaveline").toBool(true))
+		install_waveline_dock();
 	obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
 	return true;
 }
 
 void obs_module_unload(void)
 {
+	remove_waveline_dock();
+	remove_master_dock();
 	remove_fx_dock();
 	remove_switch_dock();
+	masterbus::uninstall();
 	switchsets::uninstall();
 	remove_mixer_menu_hook();
 	if (loader_installed())

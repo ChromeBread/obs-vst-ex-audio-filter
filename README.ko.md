@@ -15,7 +15,7 @@ VST 필터는 VST Enigmax Loader 소속이므로, 이것을 제거하면 OBS가 
 
 ## 설치
 
-1. [Releases](../../releases)에서 `obs-vst-ex-audio-filter-<버전>-windows-x64-setup.exe`를 다운로드합니다.
+1. [Releases](../../releases)에서 `OBS-VST-Ex-Audio-Filter-<버전>-windows-x64-setup.exe`를 다운로드합니다.
 2. OBS를 종료하고 실행합니다. "전체 설치"는 모두, "사용자 지정 설치"는 다음 중에서 고를 수 있습니다:
    - VST Ex Audio Filter (필수): "필터 (VST Ex)", 피치 / 의사 스테레오 필터, 도구 > VST Ex Audio Filter
    - VST Enigmax Loader: VST2 / VST3 플러그인
@@ -24,8 +24,8 @@ VST 필터는 VST Enigmax Loader 소속이므로, 이것을 제거하면 OBS가 
    VST Ex의 선택 항목은 나중에 도구 > VST Ex Audio Filter에서 켜고 끌 수 있습니다 (OBS 재시작 후 적용).
 3. OBS를 시작합니다. 처음 시작할 때 썸네일, 스크린샷, 기록을 저장할 곳을 묻습니다.
 
-**설치 없는 버전**: `obs-vst-ex-audio-filter-<버전>-windows-x64-portable.zip`. OBS를 종료하고
-`C:\ProgramData\obs-studio\plugins\`에 압축을 풀면 `obs-vst-ex-audio-filter` (VST Ex)와 `vst-enigmax-loader`
+**설치 없는 버전**: `OBS-VST-Ex-Audio-Filter-<버전>-windows-x64-portable.zip`. OBS를 종료하고
+`C:\ProgramData\obs-studio\plugins\`에 압축을 풀면 `OBS-VST-Ex-Audio-Filter` (VST Ex)와 `vst-enigmax-loader`
 (VST Enigmax Loader) 두 폴더가 생깁니다. 필요 없는 폴더는 넣지 않아도 됩니다. 제거는 OBS를 종료하고 폴더를 지우면
 됩니다 (VST 필터는 먼저 인계하세요. 아래 참조).
 
@@ -97,8 +97,11 @@ VST 필터는 VST Enigmax Loader 소속이므로, 이것을 제거하면 OBS가 
 
 - "VST Ex Switcher" 도크: ON/OFF 세트 버튼과 CPU 사용률 (OBS 전체와 VST 몫)
 
-![VST Ex Mixer 도크와 VST Ex Switcher 도크를 둔 OBS](docs/images/preview-obs.png)
-*VST Ex Mixer 도크와 VST Ex Switcher 도크를 둔 OBS*
+## VST Ex WaveLine
+
+- 선택한 소스의 파형을 겹쳐서 흘려 보여 줍니다
+- 왼쪽 막대: 확대/축소 (2~60초 표시). 오른쪽 Tr 버튼: 켜진 트랙에서 방송에 나가는 소스는 진하게, 나머지는 옅게 표시합니다. 버튼은 표시만 바꾸고 라우팅은 바꾸지 않습니다
+- `●`: 설정한 BPM (기본 120)으로 박자 점을 표시합니다. 박자에 맞춰 누르면 맞춰집니다. `≡`: 소스별 레이어 순서와 불투명도
 
 ## 빌드
 

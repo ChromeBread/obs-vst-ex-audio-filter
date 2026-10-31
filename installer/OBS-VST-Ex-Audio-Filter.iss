@@ -1,16 +1,16 @@
 ; Inno Setup 6.6+ script. Build: cmake --install to a stage folder, then
-;   iscc /DAppVersion=1.3.0 /DStageDir=<stage> installer\obs-vst-ex-audio-filter.iss
-; Installs two OBS modules: VST Ex (obs-vst-ex-audio-filter) and VST Enigmax Loader (vst-enigmax-loader).
+;   iscc /DAppVersion=1.4.0 /DStageDir=<stage> installer\OBS-VST-Ex-Audio-Filter.iss
+; Installs two OBS modules: VST Ex (OBS-VST-Ex-Audio-Filter) and VST Enigmax Loader (vst-enigmax-loader).
 ; The custom setup's choices go to install-features.ini, which VST Ex reads once at its next load.
 ; Uninstall asks what to keep; a backup it makes has the same layout as Tools > Debug mode > Backup.
 
 #ifndef AppVersion
-  #define AppVersion "1.3.0"
+  #define AppVersion "1.4.0"
 #endif
 #ifndef StageDir
   #define StageDir "..\build_x64\stage"
 #endif
-#define MainName "obs-vst-ex-audio-filter"
+#define MainName "OBS-VST-Ex-Audio-Filter"
 #define LoaderName "vst-enigmax-loader"
 #define FeatureIni "{userappdata}\obs-studio\plugin_config\" + MainName + "\install-features.ini"
 
@@ -19,7 +19,7 @@ AppId={{6B0E7C51-3F2A-4D8B-9E55-1C7A0F4B2D93}
 AppName=OBS VST Ex Audio Filter
 AppVersion={#AppVersion}
 AppPublisher=BlackDream feat. ChromeBread
-AppPublisherURL=https://github.com/ChromeBread/obs-vst-ex-audio-filter
+AppPublisherURL=https://github.com/ChromeBread/OBS-VST-Ex-Audio-Filter
 ; {app} is OBS's plugin folder; each module gets its own subfolder there.
 DefaultDirName={commonappdata}\obs-studio\plugins
 UsePreviousAppDir=no
@@ -54,6 +54,7 @@ en.PartLoader=VST Enigmax Loader: loads VST2 / VST3 plugins (safe scan, plugin b
 en.PartChainView=VST Ex Chain View: shows the VST chain of every audio source (devices, filters, latency, levels) with a sound imager. Tools menu and dock button
 en.PartMixer=VST Ex Mixer dock: under each Audio Mixer meter, one button per VST filter of that source. Click: ON/OFF, right-click: open the plugin
 en.PartSwitcher=VST Ex Switcher dock: ON/OFF set buttons, and CPU usage of OBS with the share used by VST plugins
+en.PartWaveline=VST Ex WaveLine dock: waveforms of chosen sources flowing on top of each other; sources that reach the stream are strong, others faint
 en.CloseObs=OBS is running. Quit OBS, then click Retry.
 en.LoaderFiltersLost=Your scene collections have %1 VST Enigmax Loader filter(s). Without VST Enigmax Loader they disappear from OBS.%n%nTo keep them, first move them to OBS VST 2.x / atkAudio in OBS: Tools > VST Enigmax Loader > Debug mode > Hand over.%n%nStop now to do that?
 en.KeepTitle=What should be removed?
@@ -82,6 +83,7 @@ ja.PartLoader=VST Enigmax Loader: VST2 / VST3 プラグインの読み込み (�
 ja.PartChainView=VST Ex Chain View: 全オーディオソースの VST チェーン (デバイス・フィルタ・レイテンシ・レベル) の表示とサウンドイメージャー。ツールメニューとドックのボタン
 ja.PartMixer=VST Ex Mixer ドック: オーディオミキサーの各メーターの下に、そのソースの VST フィルタごとのボタン。クリックで ON/OFF、右クリックでプラグインを開く
 ja.PartSwitcher=VST Ex Switcher ドック: ON/OFF セットのボタンと、OBS の CPU 使用率のうち VST プラグインが使っている割合の表示
+ja.PartWaveline=VST Ex WaveLine ドック: 選んだソースの波形を重ねて流します。配信に載るソースは濃く、載らないソースは薄く表示します
 ja.CloseObs=OBS が起動しています。OBS を終了してから「再試行」を押してください。
 ja.LoaderFiltersLost=シーンコレクションに VST Enigmax Loader のフィルタが %1 個あります。VST Enigmax Loader がないと OBS から消えます。%n%n残すには、先に OBS の ツール > VST Enigmax Loader > デバッグモード > 引き継ぎ で OBS VST 2.x / atkAudio へ移してください。%n%nいったん中止して移しますか?
 ja.KeepTitle=何を削除しますか?
@@ -110,6 +112,7 @@ fr.PartLoader=VST Enigmax Loader : charge les plugins VST2 / VST3 (analyse sûre
 fr.PartChainView=VST Ex Chain View : la chaîne VST de chaque source audio (périphériques, filtres, latence, niveaux) avec un imageur sonore. Menu Outils et bouton du dock
 fr.PartMixer=Dock VST Ex Mixer : sous chaque vumètre du mixeur audio, un bouton par filtre VST de la source. Clic : ON/OFF, clic droit : ouvrir le plugin
 fr.PartSwitcher=Dock VST Ex Switcher : boutons des ensembles ON/OFF, et utilisation CPU d'OBS avec la part prise par les plugins VST
+fr.PartWaveline=Dock VST Ex WaveLine : les formes d'onde des sources choisies défilent superposées ; celles qui vont au stream sont foncées, les autres pâles
 fr.CloseObs=OBS est ouvert. Quittez OBS puis cliquez sur Réessayer.
 fr.LoaderFiltersLost=Vos collections de scènes contiennent %1 filtre(s) VST Enigmax Loader. Sans VST Enigmax Loader, ils disparaissent d'OBS.%n%nPour les garder, déplacez-les d'abord vers OBS VST 2.x / atkAudio dans OBS : Outils > VST Enigmax Loader > Mode débogage > Transfert.%n%nArrêter maintenant pour le faire ?
 fr.KeepTitle=Que faut-il supprimer ?
@@ -138,6 +141,7 @@ ko.PartLoader=VST Enigmax Loader: VST2 / VST3 플러그인 불러오기 (안전�
 ko.PartChainView=VST Ex Chain View: 모든 오디오 소스의 VST 체인 (장치, 필터, 지연, 레벨) 표시와 사운드 이미저. 도구 메뉴와 도크 버튼
 ko.PartMixer=VST Ex Mixer 도크: 오디오 믹서의 각 미터 아래에 그 소스의 VST 필터마다 버튼. 클릭: ON/OFF, 우클릭: 플러그인 열기
 ko.PartSwitcher=VST Ex Switcher 도크: ON/OFF 세트 버튼과, OBS CPU 사용률 중 VST 플러그인이 쓰는 비율 표시
+ko.PartWaveline=VST Ex WaveLine 도크: 선택한 소스의 파형을 겹쳐서 흘려 보여 줍니다. 방송에 나가는 소스는 진하게, 나머지는 옅게 표시합니다
 ko.CloseObs=OBS가 실행 중입니다. OBS를 종료한 뒤 다시 시도를 누르세요.
 ko.LoaderFiltersLost=장면 모음에 VST Enigmax Loader 필터가 %1개 있습니다. VST Enigmax Loader가 없으면 OBS에서 사라집니다.%n%n유지하려면 먼저 OBS의 도구 > VST Enigmax Loader > 디버그 모드 > 인계 에서 OBS VST 2.x / atkAudio로 옮기세요.%n%n지금 중단하고 옮길까요?
 ko.KeepTitle=무엇을 삭제할까요?
@@ -170,6 +174,7 @@ Name: "loader"; Description: "{cm:PartLoader}"; Types: full
 Name: "chainview"; Description: "{cm:PartChainView}"; Types: full
 Name: "mixer"; Description: "{cm:PartMixer}"; Types: full
 Name: "switcher"; Description: "{cm:PartSwitcher}"; Types: full
+Name: "waveline"; Description: "{cm:PartWaveline}"; Types: full
 
 [InstallDelete]
 ; 1.0.0 had the scanner inside VST Ex's folder; it now belongs to VST Enigmax Loader.
@@ -191,6 +196,8 @@ Filename: "{#FeatureIni}"; Section: "features"; Key: "featureMixer"; String: "tr
 Filename: "{#FeatureIni}"; Section: "features"; Key: "featureMixer"; String: "false"; Components: not mixer
 Filename: "{#FeatureIni}"; Section: "features"; Key: "featureSwitcher"; String: "true"; Components: switcher
 Filename: "{#FeatureIni}"; Section: "features"; Key: "featureSwitcher"; String: "false"; Components: not switcher
+Filename: "{#FeatureIni}"; Section: "features"; Key: "featureWaveline"; String: "true"; Components: waveline
+Filename: "{#FeatureIni}"; Section: "features"; Key: "featureWaveline"; String: "false"; Components: not waveline
 
 [Code]
 var
@@ -431,7 +438,7 @@ var
   N: String;
 begin
   N := Lowercase(Rel);
-  Result := (N = 'bin\64bit\{#MainName}.dll') or (N = 'bin\64bit\{#MainName}.pdb') or
+  Result := (N = Lowercase('bin\64bit\{#MainName}.dll')) or (N = Lowercase('bin\64bit\{#MainName}.pdb')) or
             (N = 'bin\64bit\{#LoaderName}.dll') or (N = 'bin\64bit\{#LoaderName}.pdb') or
             (N = 'bin\64bit\vst-ex-scanner.exe') or (Copy(N, 1, 15) = 'uninstall\unins') or
             ((Copy(N, 1, 12) = 'data\locale\') and

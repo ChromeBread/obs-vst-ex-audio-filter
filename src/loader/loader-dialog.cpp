@@ -102,8 +102,9 @@ LoaderDialog::LoaderDialog(QWidget *parent) : QDialog(parent)
 	dataRow->addWidget(dataDir, 1);
 	dataRow->addWidget(changeDir);
 
-	// __DATE__ is "Oct 29 2026"; shown with the month named (or year / month / day marked), so no order is misread.
-	QDate built = QLocale::c().toDate(QStringLiteral(__DATE__).simplified(), "MMM d yyyy");
+	// The DLL's own date: /Brepro (reproducible builds) turns __DATE__ into "1". Shown with the month named (or
+	// year / month / day marked), so no order is misread.
+	QDate built = QFileInfo(QString::fromUtf8(obs_get_module_binary_path(obs_current_module()))).lastModified().date();
 	auto *form = new QFormLayout();
 	form->addRow(T("Loader.Version"), selectable(QString::fromUtf8(PLUGIN_VERSION)));
 	form->addRow(T("Loader.BuildDate"), selectable(QLocale(PluginMeta::instance().uiValue("language").toString(

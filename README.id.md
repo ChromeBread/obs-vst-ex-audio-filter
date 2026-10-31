@@ -15,7 +15,7 @@ bawaan OBS dengan *Serah terima* (lihat di bawah).
 
 ## Instalasi
 
-1. Unduh `obs-vst-ex-audio-filter-<versi>-windows-x64-setup.exe` dari [Releases](../../releases).
+1. Unduh `OBS-VST-Ex-Audio-Filter-<versi>-windows-x64-setup.exe` dari [Releases](../../releases).
 2. Tutup OBS lalu jalankan. *Instalasi penuh* memasang semuanya; *Instalasi kustom* bisa memilih:
    - VST Ex Audio Filter (wajib): *Filter (VST Ex)*, filter pitch / pseudo stereo, Alat > VST Ex Audio Filter
    - VST Enigmax Loader: plugin VST2 / VST3
@@ -24,8 +24,8 @@ bawaan OBS dengan *Serah terima* (lihat di bawah).
    Bagian opsional VST Ex bisa dinyalakan / dimatikan nanti di Alat > VST Ex Audio Filter (berlaku setelah OBS dimulai ulang).
 3. Jalankan OBS. Saat pertama kali, OBS menanyakan tempat menyimpan thumbnail, tangkapan layar, dan riwayat.
 
-**Portabel (tanpa installer)**: `obs-vst-ex-audio-filter-<versi>-windows-x64-portable.zip`. Tutup OBS lalu ekstrak
-ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `obs-vst-ex-audio-filter` (VST Ex) dan `vst-enigmax-loader`
+**Portabel (tanpa installer)**: `OBS-VST-Ex-Audio-Filter-<versi>-windows-x64-portable.zip`. Tutup OBS lalu ekstrak
+ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `OBS-VST-Ex-Audio-Filter` (VST Ex) dan `vst-enigmax-loader`
 (VST Enigmax Loader). Folder yang tidak diperlukan boleh tidak disalin. Untuk menghapus, tutup OBS dan hapus foldernya
 (serahterimakan filter VST dulu, lihat di bawah).
 
@@ -97,8 +97,11 @@ ke `C:\ProgramData\obs-studio\plugins\`: muncul folder `obs-vst-ex-audio-filter`
 
 - Dock *VST Ex Switcher*: tombol set ON/OFF dan penggunaan CPU (total OBS dan bagian VST)
 
-![OBS dengan dock VST Ex Mixer dan VST Ex Switcher](docs/images/preview-obs.png)
-*OBS dengan dock VST Ex Mixer dan VST Ex Switcher*
+## VST Ex WaveLine
+
+- Bentuk gelombang sumber pilihan mengalir bertumpuk
+- Bilah kiri: zoom (2 sampai 60 detik). Tombol Tr di kanan: sumber pada trek yang menyala dan masuk ke stream tampak pekat, yang lain pudar. Tombol hanya mengubah tampilan, bukan perutean
+- `●`: titik ketukan sesuai BPM pilihan (bawaan 120); tekan tepat pada ketukan untuk menyelaraskan. `≡`: urutan lapisan dan opasitas tiap sumber
 
 ## Build
 

@@ -1,7 +1,9 @@
 #include "ui/fx-dock.h"
 
+#include "master-bus.h"
 #include "plugin-meta.h"
 #include "ui/ex-filters-dialog.h"
+#include "ui/master-dock.h"
 #include "ui/ui-text.h"
 #include "loader-api.h"
 
@@ -73,6 +75,20 @@ QHash<QString, QRect> mixerStrips(bool &horizontal)
 		}
 	}
 	return out;
+}
+
+// The master strip counts as a mixer strip when it has the same shape and shares this dock's span. Any other
+// position (other side of the window, wide strip over columns...) has nothing to line up with: its column is packed.
+void addMasterStrip(QHash<QString, QRect> &strips, bool horizontal, QWidget *viewport)
+{
+	QRect strip;
+	if (!masterbus::source() || !master_strip_rect(strip) || (strip.width() > strip.height()) != horizontal)
+		return;
+	QRect view(viewport->mapToGlobal(QPoint(0, 0)), viewport->size());
+	bool shared = horizontal ? strip.bottom() >= view.top() && strip.top() <= view.bottom()
+				 : strip.right() >= view.left() && strip.left() <= view.right();
+	if (shared)
+		strips.insert(QString::fromUtf8(obs_source_get_name(masterbus::source())), strip);
 }
 
 QToolButton *toggle(QWidget *parent, const char *text, const char *tip, bool on)
@@ -178,25 +194,28 @@ private:
 	void tick()
 	{
 		std::vector<SourceFx> found; // every audio source, with or without VST
-		obs_enum_sources(
-			[](void *param, obs_source_t *source) {
-				if (!(obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO))
-					return true;
-				SourceFx fx{source, {}};
-				obs_source_enum_filters(
-					source,
-					[](obs_source_t *, obs_source_t *filter, void *p) {
-						if (isVstFilter(filter))
-							static_cast<SourceFx *>(p)->filters.emplace_back(filter);
-					},
-					&fx);
-				static_cast<std::vector<SourceFx> *>(param)->push_back(std::move(fx));
+		auto addSource = [](void *param, obs_source_t *source) {
+			if (!(obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO))
 				return true;
-			},
-			&found);
+			SourceFx fx{source, {}};
+			obs_source_enum_filters(
+				source,
+				[](obs_source_t *, obs_source_t *filter, void *p) {
+					if (isVstFilter(filter))
+						static_cast<SourceFx *>(p)->filters.emplace_back(filter);
+				},
+				&fx);
+			static_cast<std::vector<SourceFx> *>(param)->push_back(std::move(fx));
+			return true;
+		};
+		obs_enum_sources(addSource, &found);
+		if (obs_source_t *master = masterbus::source()) // private, so obs_enum_sources doesn't list it
+			addSource(&found, master);
 
 		bool horizontal = false;
 		QHash<QString, QRect> strips = follow->isChecked() ? mixerStrips(horizontal) : QHash<QString, QRect>();
+		if (follow->isChecked())
+			addMasterStrip(strips, horizontal, scroll->viewport());
 		QString signature = horizontal ? "H" : "V"; // rows or columns: the boxes are built differently
 		for (const auto &fx : found) {
 			signature += QString::fromUtf8(obs_source_get_uuid(fx.source)) + QString::fromUtf8(obs_source_get_name(fx.source));
@@ -292,6 +311,8 @@ private:
 			tick();
 			return;
 		}
+		if (follow->isChecked())
+			addMasterStrip(strips, horizontal, scroll->viewport());
 		place(strips, horizontal);
 	}
 
@@ -324,11 +345,13 @@ private:
 			for (Column *col : order)
 				if (auto it = strips.find(col->source); it != strips.end())
 					nextFree = std::max(nextFree, it->right() - origin.x() + 1);
+		int taken = 0; // right edge of the columns under their strips: two strips can stack (master above the mixer)
 		for (Column *col : order) {
 			QRect geo;
 			auto it = strips.find(col->source);
-			if (it != strips.end() && keepSpace) {
+			if (it != strips.end() && keepSpace && it->left() - origin.x() >= taken) {
 				geo = QRect(it->left() - origin.x(), 0, it->width(), 0); // right under its strip
+				taken = geo.right() + 1;
 			} else {
 				int w = it != strips.end() ? it->width() : kPlainWidth;
 				geo = QRect(nextFree, 0, w, 0);
@@ -368,12 +391,14 @@ private:
 			for (Column *col : order)
 				if (auto it = strips.find(col->source); it != strips.end())
 					nextFree = std::max(nextFree, it->bottom() - origin.y() + 1);
+		int taken = 0;
 		for (Column *col : order) {
 			auto it = strips.find(col->source);
 			int h = std::max(col->box->sizeHint().height(), it != strips.end() ? it->height() : 0);
 			QRect geo;
-			if (it != strips.end() && keepSpace) {
-				geo = QRect(0, std::max(0, it->top() - origin.y()), width, h); // beside its mixer row
+			if (it != strips.end() && keepSpace && it->top() - origin.y() >= taken) {
+				geo = QRect(0, it->top() - origin.y(), width, h); // beside its mixer row
+				taken = geo.bottom() + 1;
 			} else {
 				geo = QRect(0, nextFree, width, h);
 				nextFree += h;

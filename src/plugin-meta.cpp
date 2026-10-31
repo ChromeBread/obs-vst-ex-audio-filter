@@ -114,7 +114,7 @@ PluginMeta::PluginMeta()
 	QString picked = configPath("install-features.ini");
 	if (QFile::exists(picked)) {
 		QSettings ini(picked, QSettings::IniFormat);
-		for (const char *key : {"featureChainView", "featureMixer", "featureSwitcher"})
+		for (const char *key : {"featureChainView", "featureMixer", "featureSwitcher", "featureWaveline"})
 			ui[key] = ini.value(QString("features/") + key, true).toBool();
 		save();
 		QFile::remove(picked);

@@ -15,7 +15,7 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
 
 ## インストール
 
-1. [Releases](../../releases) から `obs-vst-ex-audio-filter-<バージョン>-windows-x64-setup.exe` をダウンロード。
+1. [Releases](../../releases) から `OBS-VST-Ex-Audio-Filter-<バージョン>-windows-x64-setup.exe` をダウンロード。
 2. OBS を終了して実行。「フル インストール」はすべて、「カスタム インストール」は次から選べます:
    - VST Ex Audio Filter (必須): 「フィルタ (VST Ex)」、ピッチ / 疑似ステレオ フィルタ、ツール > VST Ex Audio Filter
    - VST Enigmax Loader: VST2 / VST3 プラグイン
@@ -24,8 +24,8 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
    VST Ex の任意の部分は、あとから ツール > VST Ex Audio Filter でオン / オフできます (OBS 再起動後に反映)。
 3. OBS を起動。初回にサムネイル・スクリーンショット・履歴の保存先を聞かれます。
 
-**インストール不要版**: `obs-vst-ex-audio-filter-<バージョン>-windows-x64-portable.zip`。OBS を終了し、
-`C:\ProgramData\obs-studio\plugins\` に展開すると `obs-vst-ex-audio-filter` (VST Ex) と `vst-enigmax-loader`
+**インストール不要版**: `OBS-VST-Ex-Audio-Filter-<バージョン>-windows-x64-portable.zip`。OBS を終了し、
+`C:\ProgramData\obs-studio\plugins\` に展開すると `OBS-VST-Ex-Audio-Filter` (VST Ex) と `vst-enigmax-loader`
 (VST Enigmax Loader) の 2 フォルダができます。不要な方はフォルダごと入れなくて構いません。削除は OBS を終了してフォルダを
 消すだけです (VST フィルタは先に引き継いでください。下記参照)。
 
@@ -97,8 +97,11 @@ VST フィルタは VST Enigmax Loader のものなので、これを削除す�
 
 - 「VST Ex Switcher」ドック: ON/OFF セットのボタンと CPU 使用率 (OBS 全体と VST の分)
 
-![VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS](docs/images/preview-obs.png)
-*VST Ex Mixer ドックと VST Ex Switcher ドックを置いた OBS*
+## VST Ex WaveLine
+
+- 選んだソースの波形を重ねて流します
+- 左のバーで拡大縮小 (2〜60 秒を表示)。右の Tr ボタンで選んだトラックのうち、配信に載るソースは濃く、それ以外は薄く表示します。ボタンは表示だけを変え、ルーティングは変えません
+- `●`: 設定した BPM (初期値 120) で拍のドットを表示します。拍に合わせて押すと揃います。`≡`: ソースごとの重ね順と透過度
 
 ## ビルド
 

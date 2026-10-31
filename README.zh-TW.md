@@ -15,7 +15,7 @@ VST 濾鏡屬於 VST Enigmax Loader，移除它後 OBS 就無法載入這些濾�
 
 ## 安裝
 
-1. 從 [Releases](../../releases) 下載 `obs-vst-ex-audio-filter-<版本>-windows-x64-setup.exe`。
+1. 從 [Releases](../../releases) 下載 `OBS-VST-Ex-Audio-Filter-<版本>-windows-x64-setup.exe`。
 2. 關閉 OBS 後執行。「完整安裝」安裝全部；「自訂安裝」可選擇:
    - VST Ex Audio Filter (必要):「濾鏡 (VST Ex)」、音高 / 偽立體聲濾鏡、工具 > VST Ex Audio Filter
    - VST Enigmax Loader: VST2 / VST3 外掛
@@ -24,8 +24,8 @@ VST 濾鏡屬於 VST Enigmax Loader，移除它後 OBS 就無法載入這些濾�
    VST Ex 的選用部分之後可在 工具 > VST Ex Audio Filter 開關 (重新啟動 OBS 後生效)。
 3. 啟動 OBS。第一次啟動時會詢問縮圖、截圖與歷程的儲存位置。
 
-**免安裝版**: `obs-vst-ex-audio-filter-<版本>-windows-x64-portable.zip`。關閉 OBS 後解壓縮到
-`C:\ProgramData\obs-studio\plugins\`，會得到 `obs-vst-ex-audio-filter` (VST Ex) 與 `vst-enigmax-loader`
+**免安裝版**: `OBS-VST-Ex-Audio-Filter-<版本>-windows-x64-portable.zip`。關閉 OBS 後解壓縮到
+`C:\ProgramData\obs-studio\plugins\`，會得到 `OBS-VST-Ex-Audio-Filter` (VST Ex) 與 `vst-enigmax-loader`
 (VST Enigmax Loader) 兩個資料夾。不需要的資料夾可以不放。移除時關閉 OBS 並刪除資料夾即可 (請先移交 VST 濾鏡，見下方)。
 
 **解除安裝** (Windows 設定 > 應用程式 > OBS VST Ex Audio Filter)。解除安裝程式會:
@@ -94,8 +94,11 @@ VST 濾鏡屬於 VST Enigmax Loader，移除它後 OBS 就無法載入這些濾�
 
 -「VST Ex Switcher」停駐視窗: ON/OFF 組合按鈕與 CPU 使用率 (OBS 整體與 VST 部分)
 
-![放置 VST Ex Mixer 與 VST Ex Switcher 停駐視窗的 OBS](docs/images/preview-obs.png)
-*放置 VST Ex Mixer 與 VST Ex Switcher 停駐視窗的 OBS*
+## VST Ex WaveLine
+
+- 將選定來源的波形重疊流動顯示
+- 左側長條: 縮放 (顯示 2 到 60 秒)。右側 Tr 按鈕: 亮起音軌上會送往直播的來源顯示較深，其他較淡。按鈕只改變顯示，不改變路由
+- `●`: 依設定的 BPM (預設 120) 顯示節拍點，按拍按下即可對齊。`≡`: 各來源的圖層順序與不透明度
 
 ## 建置
 

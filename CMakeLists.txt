@@ -46,6 +46,8 @@ add_executable(pitch-shifter-test EXCLUDE_FROM_ALL src/dsp/pitch-shifter-test.cp
 target_include_directories(pitch-shifter-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_executable(beat-align-test EXCLUDE_FROM_ALL src/dsp/beat-align-test.cpp)
 target_include_directories(beat-align-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+add_executable(peak-ring-test EXCLUDE_FROM_ALL src/dsp/peak-ring-test.cpp)
+target_include_directories(peak-ring-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 add_executable(juce-format-test EXCLUDE_FROM_ALL src/loader/juce-format-test.cpp)
 target_include_directories(juce-format-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -55,6 +57,11 @@ find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
 
 # VST Enigmax Loader: VST2/VST3 hosting as its own OBS module, so VST Ex can be left out (or removed)
 # without the VST filters, and the loader works on its own in OBS's standard Filters window.
+# End-to-end check of the virtual track on a real libobs; see the file header for how to run it.
+add_executable(master-virtual-test EXCLUDE_FROM_ALL src/master-virtual-test.cpp src/master-virtual.h)
+target_include_directories(master-virtual-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(master-virtual-test PRIVATE OBS::libobs)
+
 add_library(vst-enigmax-loader MODULE)
 add_dependencies(vst-enigmax-loader vst-ex-scanner)
 target_compile_definitions(vst-enigmax-loader PRIVATE VST_ENIGMAX_LOADER LOADER_VERSION="${_version}")
@@ -99,6 +106,9 @@ target_sources(
   PRIVATE
     src/plugin-main.cpp
     src/loader-api.h
+    src/master-bus.cpp
+    src/master-bus.h
+    src/master-virtual.h
     src/vst-filter.h
     src/plugin-meta.cpp
     src/plugin-meta.h
@@ -106,6 +116,7 @@ target_sources(
     src/pitch-filter.h
     src/stereo-filter.cpp
     src/stereo-filter.h
+    src/dsp/peak-ring.h
     src/dsp/pseudo-stereo.h
     src/dsp/pitch-shifter.h
     src/switch-sets.cpp
@@ -122,6 +133,8 @@ target_sources(
     src/ui/fx-dock.cpp
     src/ui/fx-dock.h
     src/ui/menu-hook.h
+    src/ui/master-dock.cpp
+    src/ui/master-dock.h
     src/ui/properties-panel.cpp
     src/ui/properties-panel.h
     src/ui/switch-dock.cpp
@@ -131,6 +144,8 @@ target_sources(
     src/ui/switch-dock.h
     src/ui/tools-dialog.cpp
     src/ui/tools-dialog.h
+    src/ui/waveline-dock.cpp
+    src/ui/waveline-dock.h
     src/ui/ui-text.h
 )
 

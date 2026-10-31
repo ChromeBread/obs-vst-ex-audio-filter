@@ -20,7 +20,7 @@
 
 // Backup layout (the uninstaller writes the same one):
 //   vst-ex-backup.ini
-//   config/obs-vst-ex-audio-filter/*   VST Ex settings (top-level files of its config folder)
+//   config/OBS-VST-Ex-Audio-Filter/*   VST Ex settings (top-level files of its config folder)
 //   config/vst-enigmax-loader/*        VST Enigmax Loader settings, plugin cache
 //   data/thumbnails, data/screenshots  the loader's pictures
 //   data/history, data/presets         VST Ex's filter history and chain presets
@@ -28,7 +28,7 @@
 
 namespace {
 
-const char *kMainName = "obs-vst-ex-audio-filter";
+const char *kMainName = "OBS-VST-Ex-Audio-Filter";
 const char *kLoaderName = "vst-enigmax-loader";
 const char *kLoaderSubs[] = {"thumbnails", "screenshots"};
 const char *kMainSubs[] = {"history", "presets"};

@@ -54,7 +54,7 @@ void migrateFromVstEx()
 	char *p = obs_module_config_path("");
 	QDir mine(QString::fromUtf8(p));
 	bfree(p);
-	QDir old(mine.absoluteFilePath("../obs-vst-ex-audio-filter"));
+	QDir old(mine.absoluteFilePath("../OBS-VST-Ex-Audio-Filter"));
 	if (QFileInfo::exists(mine.filePath("plugin-meta.json")) || !QFileInfo::exists(old.filePath("plugin-meta.json")))
 		return;
 	mine.mkpath(".");

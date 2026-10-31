@@ -17,6 +17,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QToolButton>
 #include <QScrollArea>
@@ -25,6 +26,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <vector>
 
 namespace {
@@ -77,12 +79,52 @@ bool isActive(obs_source_t *source, const switchsets::Set &set)
 	return ctx.match;
 }
 
+// OBS's CPU as lit ticks; the VST share is the first of them, in its own colour.
+class CpuBar : public QWidget {
+public:
+	explicit CpuBar(QWidget *parent) : QWidget(parent)
+	{
+		setFixedHeight(18);
+		setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	}
+
+	void setValues(double obsPct, double vstPct)
+	{
+		obs = obsPct;
+		vst = vstPct;
+		update();
+	}
+
+protected:
+	void paintEvent(QPaintEvent *) override
+	{
+		constexpr int kTicks = 10, kPitch = 4, kPad = 3; // one tick is 10% of the whole CPU
+		QPainter p(this);
+		p.fillRect(rect(), QColor(16, 16, 16));
+		p.setPen(QColor(70, 70, 70));
+		p.drawRect(rect().adjusted(0, 0, -1, -1));
+		int litObs = obs <= 0.0 ? 0 : std::clamp(int(std::ceil(obs / 10.0)), 1, kTicks);
+		int litVst = std::min(int(std::lround(vst / 10.0)), litObs); // rounded: a tiny share must not fill a whole 10% tick
+		QColor load = obs >= 85.0 ? QColor(244, 67, 54) : obs >= 60.0 ? QColor(255, 193, 7) : QColor(76, 175, 80);
+		for (int i = 0; i < kTicks; i++) {
+			QColor c = i < litVst ? QColor(0, 188, 212) : i < litObs ? load : QColor(52, 52, 52);
+			p.fillRect(kPad + i * kPitch, 3, 2, height() - 6, c);
+		}
+		p.setPen(QColor(220, 220, 220));
+		// Two decimals: on many-core CPUs the share is small and would look frozen with one.
+		p.drawText(rect().adjusted(kPad * 2 + kTicks * kPitch, 0, -kPad, 0), Qt::AlignLeft | Qt::AlignVCenter,
+			   QStringLiteral("VST %1%").arg(vst, 0, 'f', 2));
+	}
+
+private:
+	double obs = 0.0, vst = 0.0;
+};
+
 class SwitchDock : public QWidget {
 public:
 	SwitchDock() : QWidget(nullptr)
 	{
-		cpu = new QLabel(this);
-		cpu->setToolTip(T("Dock.Cpu.Tip"));
+		cpu = new CpuBar(this);
 		// Display options, layout editing and the how-to, out of the way in one menu.
 		auto &meta = PluginMeta::instance();
 		auto *options = new QToolButton(this);
@@ -318,10 +360,12 @@ private:
 						: 0.0;
 		lastWall = wall;
 		lastVst = vst;
-		cpu->setText(T("Dock.Cpu").arg(os_cpu_usage_info_query(usage), 0, 'f', 1).arg(vstPct, 0, 'f', 1));
+		double obsPct = os_cpu_usage_info_query(usage);
+		cpu->setValues(obsPct, vstPct);
+		cpu->setToolTip(T("Dock.Cpu").arg(obsPct, 0, 'f', 1).arg(vstPct, 0, 'f', 2) + "\n" + T("Dock.Cpu.Tip"));
 	}
 
-	QLabel *cpu;
+	CpuBar *cpu;
 	QAction *showNames, *showMemo, *editMode;
 	QWidget *content;
 	QTimer timer;

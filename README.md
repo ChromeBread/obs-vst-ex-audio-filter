@@ -15,7 +15,7 @@ to OBS's own VST 2.x filter first with *Hand over* (see below).
 
 ## Install
 
-1. Download `obs-vst-ex-audio-filter-<version>-windows-x64-setup.exe` from [Releases](../../releases).
+1. Download `OBS-VST-Ex-Audio-Filter-<version>-windows-x64-setup.exe` from [Releases](../../releases).
 2. Quit OBS and run it. *Full installation* installs everything; *Custom installation* lets you choose:
    - VST Ex Audio Filter (required): *Filters (VST Ex)*, pitch / pseudo-stereo filters, Tools > VST Ex Audio Filter
    - VST Enigmax Loader: VST2 / VST3 plugins
@@ -24,8 +24,8 @@ to OBS's own VST 2.x filter first with *Hand over* (see below).
    The optional VST Ex parts can be switched on or off later in Tools > VST Ex Audio Filter (applies after an OBS restart).
 3. Start OBS. On first start it asks where to keep thumbnails, screenshots and history.
 
-**Portable (no installer)**: `obs-vst-ex-audio-filter-<version>-windows-x64-portable.zip`. Quit OBS and extract it
-into `C:\ProgramData\obs-studio\plugins\`: you get the folders `obs-vst-ex-audio-filter` (VST Ex) and
+**Portable (no installer)**: `OBS-VST-Ex-Audio-Filter-<version>-windows-x64-portable.zip`. Quit OBS and extract it
+into `C:\ProgramData\obs-studio\plugins\`: you get the folders `OBS-VST-Ex-Audio-Filter` (VST Ex) and
 `vst-enigmax-loader` (VST Enigmax Loader). Leave out a folder you do not want. To remove it, quit OBS and delete the
 folders (hand VST filters over first, see below).
 
@@ -97,8 +97,11 @@ folders (hand VST filters over first, see below).
 
 - *VST Ex Switcher* dock: ON/OFF set buttons and CPU usage (OBS total and VST share)
 
-![OBS with the VST Ex Mixer and VST Ex Switcher docks](docs/images/preview-obs.png)
-*OBS with the VST Ex Mixer and VST Ex Switcher docks*
+## VST Ex WaveLine
+
+- Waveforms of the sources you choose, flowing on top of each other
+- Bar on the left: zoom (2 to 60 seconds shown). Tr buttons on the right: sources on the lit tracks that reach the stream are strong, the others faint. The buttons only change the display, not the routing
+- `●`: beat dots at the BPM you set (default 120); press it on a beat to line them up. `≡`: layer order and opacity of each source
 
 ## Build
 

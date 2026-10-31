@@ -15,7 +15,7 @@ les filtres VST2 vers le filtre VST 2.x d'OBS avec *Transfert* (voir plus bas).
 
 ## Installation
 
-1. Téléchargez `obs-vst-ex-audio-filter-<version>-windows-x64-setup.exe` depuis [Releases](../../releases).
+1. Téléchargez `OBS-VST-Ex-Audio-Filter-<version>-windows-x64-setup.exe` depuis [Releases](../../releases).
 2. Quittez OBS et lancez-le. *Installation complète* installe tout ; *Installation personnalisée* permet de choisir :
    - VST Ex Audio Filter (requis) : *Filtres (VST Ex)*, filtres hauteur / pseudo-stéréo, Outils > VST Ex Audio Filter
    - VST Enigmax Loader : plugins VST2 / VST3
@@ -24,8 +24,8 @@ les filtres VST2 vers le filtre VST 2.x d'OBS avec *Transfert* (voir plus bas).
    Les parties facultatives de VST Ex s'activent ou se désactivent ensuite dans Outils > VST Ex Audio Filter (après redémarrage d'OBS).
 3. Lancez OBS. Au premier démarrage, il demande où garder miniatures, captures et historique.
 
-**Portable (sans installeur)** : `obs-vst-ex-audio-filter-<version>-windows-x64-portable.zip`. Quittez OBS et
-extrayez-le dans `C:\ProgramData\obs-studio\plugins\` : vous obtenez les dossiers `obs-vst-ex-audio-filter` (VST Ex)
+**Portable (sans installeur)** : `OBS-VST-Ex-Audio-Filter-<version>-windows-x64-portable.zip`. Quittez OBS et
+extrayez-le dans `C:\ProgramData\obs-studio\plugins\` : vous obtenez les dossiers `OBS-VST-Ex-Audio-Filter` (VST Ex)
 et `vst-enigmax-loader` (VST Enigmax Loader). Omettez celui dont vous ne voulez pas. Pour retirer, quittez OBS et
 supprimez les dossiers (transférez d'abord les filtres VST, voir plus bas).
 
@@ -97,8 +97,11 @@ supprimez les dossiers (transférez d'abord les filtres VST, voir plus bas).
 
 - Dock *VST Ex Switcher* : boutons des ensembles ON/OFF et utilisation CPU (OBS total et part VST)
 
-![OBS avec les docks VST Ex Mixer et VST Ex Switcher](docs/images/preview-obs.png)
-*OBS avec les docks VST Ex Mixer et VST Ex Switcher*
+## VST Ex WaveLine
+
+- Les formes d'onde des sources choisies défilent superposées
+- Barre de gauche : zoom (2 à 60 secondes affichées). Boutons Tr à droite : les sources des pistes allumées qui vont au stream sont foncées, les autres pâles. Les boutons ne changent que l'affichage, pas le routage
+- `●` : points de battement au BPM choisi (120 par défaut) ; appuyez sur un temps pour les aligner. `≡` : ordre des calques et opacité de chaque source
 
 ## Compilation
 

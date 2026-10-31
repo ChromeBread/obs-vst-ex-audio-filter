@@ -1,9 +1,11 @@
 #include "ui/tools-dialog.h"
 
+#include "master-bus.h"
 #include "plugin-meta.h"
 #include "ui/backup.h"
 #include "loader-api.h"
 #include "ui/chain-view.h"
+#include "ui/master-dock.h"
 #include "ui/ui-text.h"
 
 #include <obs-frontend-api.h>
@@ -20,7 +22,8 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
-#include <QDate>
+#include <QDateTime>
+#include <QFileInfo>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
@@ -29,6 +32,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QScrollArea>
 #include <QTabWidget>
 #include <QTimer>
 #include <QUrl>
@@ -204,7 +208,8 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	auto *featureLayout = new QVBoxLayout(features);
 	for (auto [key, text] : {std::pair{"featureChainView", "Tools.Feature.ChainView"},
 				 {"featureMixer", "Tools.Feature.Mixer"},
-				 {"featureSwitcher", "Tools.Feature.Switcher"}}) {
+				 {"featureSwitcher", "Tools.Feature.Switcher"},
+				 {"featureWaveline", "Tools.Feature.Waveline"}}) {
 		auto *box = new QCheckBox(T(text), features);
 		box->setChecked(meta.uiValue(key).toBool(true));
 		connect(box, &QCheckBox::toggled, this, [key](bool on) { PluginMeta::instance().setUiValue(key, on); });
@@ -222,11 +227,11 @@ ToolsDialog::ToolsDialog(QWidget *parent) : QDialog(parent)
 	form->addRow(QString(), languageNote);
 	form->addRow(hiddenBoth);
 	form->addRow(T("Tools.Version"), selectable(QString::fromUtf8(PLUGIN_VERSION)));
-	// __DATE__ is "Oct 27 2026" (English, ambiguous order for some readers); parse it, then format per language.
-	QDate built = QLocale::c().toDate(QStringLiteral(__DATE__).simplified(), "MMM d yyyy");
+	// The DLL's own date: /Brepro (reproducible builds) turns __DATE__ and __TIME__ into "1".
+	QDateTime built = QFileInfo(QString::fromUtf8(obs_get_module_binary_path(obs_current_module()))).lastModified();
 	// Per-language pattern that cannot be misread: month names ("MMMM d, yyyy") or marked units ("yyyy'年'M'月'd'日'").
-	QString builtText = QLocale(currentLanguage()).toString(built, T("Tools.BuildDate.Format"));
-	form->addRow(T("Tools.BuildDate"), selectable(builtText + "  " + QStringLiteral(__TIME__).left(5)));
+	QString builtText = QLocale(currentLanguage()).toString(built.date(), T("Tools.BuildDate.Format"));
+	form->addRow(T("Tools.BuildDate"), selectable(builtText + "  " + built.toString("HH:mm")));
 	form->addRow(T("Tools.Author"), selectable(QStringLiteral("BlackDream feat. ChromeBread")));
 	form->addRow(debug);
 
@@ -313,6 +318,45 @@ QWidget *ToolsDialog::buildDebugSection()
 	backupLayout->addLayout(backupButtons);
 	backupLayout->addStretch(1);
 	tabs->addTab(backup, T("Backup"));
+
+	// VST Ex Master: experimental, so nothing of it exists in OBS until the user accepts what is written here
+	auto *master = new QWidget(box);
+	auto *masterLayout = new QVBoxLayout(master);
+	auto *masterText = new QLabel(T("Master.HowTo.Text") + "<br><br>" + T("Master.Unlock.Cautions"), master);
+	masterText->setTextFormat(Qt::RichText);
+	masterText->setWordWrap(true);
+	masterText->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+	auto *masterScroll = new QScrollArea(master);
+	masterScroll->setWidgetResizable(true);
+	masterScroll->setFrameShape(QFrame::NoFrame);
+	masterScroll->setWidget(masterText);
+	auto *agree = new QCheckBox(T("Master.Unlock.Agree"), master);
+	auto *unlocked = new QLabel(T("Master.Unlock.Done"), master);
+	auto *unlock = new QPushButton(master);
+	auto refresh = [agree, unlocked, unlock] {
+		bool on = masterbus::unlocked();
+		agree->setVisible(!on);
+		unlocked->setVisible(on);
+		unlock->setText(on ? T("Master.Unlock.Lock") : T("Master.Unlock.Button"));
+		unlock->setEnabled(on ? !masterbus::onStream() : agree->isChecked()); // locking mid-stream would cut its sound
+	};
+	connect(agree, &QCheckBox::toggled, this, refresh);
+	connect(unlock, &QPushButton::clicked, this, [agree, refresh] {
+		bool on = !masterbus::unlocked();
+		masterbus::setUnlocked(on);
+		if (on)
+			install_master_dock();
+		else
+			remove_master_dock();
+		agree->setChecked(false);
+		refresh();
+	});
+	masterLayout->addWidget(masterScroll, 1);
+	masterLayout->addWidget(agree);
+	masterLayout->addWidget(unlocked);
+	masterLayout->addWidget(unlock);
+	refresh();
+	tabs->addTab(master, QStringLiteral("VST Ex Master"));
 
 	return tabs;
 }
